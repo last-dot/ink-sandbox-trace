@@ -1,13 +1,13 @@
-use std::{fs};
+use std::fs;
 
 use polkavm::{ArcBytes, ProgramBlob};
 
 pub type SandboxError = Box<dyn std::error::Error>;
 
 pub struct Sandbox {
-    pub blob: ProgramBlob,
+    blob: ProgramBlob,
     engine: polkavm::Engine,
-    pub module: polkavm::Module,
+    module: polkavm::Module,
     module_config: polkavm::ModuleConfig,
 }
 
@@ -45,4 +45,3 @@ impl Sandbox {
         Ok(instance)
     }
 }
-
