@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 const CARGO_TOML: &str = "Cargo.toml";
 const POLKAVM_LOCATION: &str = "target/ink/flipper.polkavm";
 
-fn find_root(rust_src: &str) -> Option<PathBuf> {
+pub(crate) fn find_root(rust_src: &str) -> Option<PathBuf> {
     let current_src = Path::new(rust_src);
     let mut current_dir = current_src.parent()?;
 
@@ -28,7 +28,7 @@ fn find_root(rust_src: &str) -> Option<PathBuf> {
     None
 }
 
-fn find_polkavm(rust_src: &str) -> Option<PathBuf> {
+pub(crate) fn find_polkavm(rust_src: &str) -> Option<PathBuf> {
     let root = find_root(rust_src)?;
 
     let polkavm_candidate = root.join(POLKAVM_LOCATION);
@@ -39,11 +39,11 @@ fn find_polkavm(rust_src: &str) -> Option<PathBuf> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use crate::utils::{find_polkavm, find_root};
     use std::path::PathBuf;
 
-    const SRC: &str = "ink-trace-extension/sampleWorkspace/lib.rs";
+    pub(crate) const SRC: &str = "ink-trace-extension/sampleWorkspace/lib.rs";
     const POLKAVM_LOCATION: &str = "ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm";
     const SRC_CONTRACT_LOCATION: &str = "ink-trace-extension/sampleWorkspace";
 
@@ -72,7 +72,7 @@ mod tests {
         assert_eq!(result, expected);
     }
 
-    fn get_root_dir() -> PathBuf {
+    pub(crate) fn get_root_dir() -> PathBuf {
         let root_dir = std::env::current_dir()
             .unwrap()
             .parent()
