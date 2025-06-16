@@ -50,7 +50,6 @@ impl Display for DapResponse {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DapCommand {
     Initialize(Option<String>), // Инициализация отладчика
-    Launch,                     // Запуск отладки
     Disconnect,                 // Отключение отладчика
     ConfigurationDone,          // Завершение конфигурации
     SetBreakpoints(Vec<usize>), // Установка брейкпоинтов
@@ -69,7 +68,6 @@ pub enum DapCommand {
 pub fn dispatch_command<T, H: DapHandler<T>>(handler: &mut H, command: DapCommand) -> T {
     match command {
         Initialize(path) => handler.handle_initialize(path),
-        Launch => handler.handle_launch(),
         Disconnect => handler.handle_disconnect(),
         ConfigurationDone => handler.handle_configuration_done(),
         SetBreakpoints(lines) => handler.handle_set_breakpoints(lines),
@@ -97,7 +95,6 @@ impl From<&mut BufReader<StdinLock<'_>>> for DapCommand {
 
         match request.command.as_str() {
             "initialize" => Initialize(request.arguments.map(|args| args.path.unwrap())),
-            "launch" => Launch,
             "disconnect" => Disconnect,
             "configurationDone" => ConfigurationDone,
             "setBreakpoints" => SetBreakpoints(Vec::new()),

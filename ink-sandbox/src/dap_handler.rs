@@ -15,7 +15,6 @@ impl CliHandler {
 
 pub(crate) trait DapHandler<T> {
     fn handle_initialize(&mut self, path: Option<String>) -> T;
-    fn handle_launch(&mut self) -> T;
     fn handle_disconnect(&mut self) -> T;
     fn handle_configuration_done(&mut self) -> T;
     fn handle_set_breakpoints(&mut self, lines: Vec<usize>) -> T;
@@ -49,10 +48,6 @@ impl DapHandler<DapResponse> for CliHandler {
             sandbox.enable_step_tracing();
         }
 
-        DapResponse::new("initialize", true)
-    }
-
-    fn handle_launch(&mut self) -> DapResponse {
         DapResponse::new("initialize", true)
     }
 
