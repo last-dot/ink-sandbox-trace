@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
@@ -24,26 +27,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install Rust toolchain
-        uses: actions-rs/toolchain@v1
+      - name: Set up Rust
+        uses: rust-lang/setup-rust@v1
         with:
-          toolchain: stable
-          target: ${{ matrix.target }}
-          override: true
+          rust-version: stable
+          targets: ${{ matrix.target }}
 
-      - name: Add target
-        run: rustup target add ${{ matrix.target }}
-
-      - name: Build release binary
+      - name: Build ink-sandbox
         working-directory: ./ink-sandbox
         run: cargo build --release --target ${{ matrix.target }}
 
-      - name: Move binary to /bin/ink-sandbox/
+      - name: Prepare bin folder
         run: |
           mkdir -p bin/ink-sandbox
           cp ink-sandbox/target/${{ matrix.target }}/release/ink-sandbox${{ matrix.ext }} bin/ink-sandbox/ink-sandbox-${{ matrix.target }}${{ matrix.ext }}
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ink-sandbox-${{ matrix.target }}
-          path: bin/ink-sandbox/
+      - name: Commit and push binaries
+        if: github.ref == 'refs/heads/main'
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add bin/
+          git commit -m "Update binaries for ${{ matrix.target }}" || echo "No changes"
+          git push
