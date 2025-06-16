@@ -1,7 +1,7 @@
+use std::fmt::{Display, Formatter};
 use crate::api::DapCommand::*;
-use crate::sandbox::Sandbox;
-use crate::utils::find_polkavm;
-use serde::Deserialize;
+use crate::dap_handler::DapHandler;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::io::{BufRead, BufReader, StdinLock};
 
@@ -16,6 +16,35 @@ struct DapRequest {
     typ: String,
     command: String,
     arguments: Option<DapRequestArgs>,
+}
+
+#[derive(Debug, Serialize)]
+pub(crate) struct DapResponse {
+    pub(crate) command: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) message: Option<String>,
+    pub(crate) status: bool,
+}
+
+impl DapResponse {
+    pub(crate) fn new(command: &str, status: bool) -> Self {
+        DapResponse {
+            command: command.to_string(),
+            message: None,
+            status,
+        }
+    }
+
+    pub(crate) fn set_message(&mut self, message: &str) {
+        self.message = Some(message.to_string());
+    }
+}
+
+impl Display for DapResponse {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let j = json!(self);
+        write!(f, "{}", j)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,25 +66,7 @@ pub enum DapCommand {
     Unknown(String),            // Любая неподдерживаемая команда
 }
 
-pub trait DapHandler {
-    fn handle_initialize(&mut self, path: Option<String>) -> Value;
-    fn handle_launch(&mut self) -> Value;
-    fn handle_disconnect(&mut self) -> Value;
-    fn handle_configuration_done(&mut self) -> Value;
-    fn handle_set_breakpoints(&mut self, lines: Vec<usize>) -> Value;
-    fn handle_continue(&mut self) -> Value;
-    fn handle_next(&mut self) -> Value;
-    fn handle_step_in(&mut self) -> Value;
-    fn handle_step_out(&mut self) -> Value;
-    fn handle_pause(&mut self) -> Value;
-    fn handle_threads(&mut self) -> Value;
-    fn handle_stack_trace(&mut self) -> Value;
-    fn handle_scopes(&mut self) -> Value;
-    fn handle_variables(&mut self) -> Value;
-    fn handle_unknown(&mut self, command: String) -> Value;
-}
-
-pub fn dispatch_command<H: DapHandler>(handler: &mut H, command: DapCommand) -> Value {
+pub fn dispatch_command<T, H: DapHandler<T>>(handler: &mut H, command: DapCommand) -> T {
     match command {
         Initialize(path) => handler.handle_initialize(path),
         Launch => handler.handle_launch(),
@@ -75,93 +86,6 @@ pub fn dispatch_command<H: DapHandler>(handler: &mut H, command: DapCommand) -> 
     }
 }
 
-pub struct CliHandler {
-    sandbox: Option<Sandbox>,
-}
-
-impl CliHandler {
-    pub fn new() -> CliHandler {
-        CliHandler { sandbox: None }
-    }
-}
-
-impl DapHandler for CliHandler {
-    fn handle_initialize(&mut self, path: Option<String>) -> Value {
-        let polkavm = if let Some(path) = path {
-            find_polkavm(path.as_str())
-                .expect("Could not find the polkavm file")
-                .as_os_str()
-                .to_str()
-                .unwrap()
-                .to_string()
-        } else {
-            String::new()
-        };
-        self.sandbox =
-            Some(Sandbox::from_uri(polkavm.as_str()).expect("Could not create the sandbox"));
-        if let Some(sandbox) = &mut self.sandbox {
-            sandbox.enable_step_tracing();
-        }
-        json!({ "command": "initialized", "path": polkavm })
-    }
-
-    fn handle_launch(&mut self) -> Value {
-        json!({"type": "Launch", "polkavm": true})
-    }
-
-    fn handle_disconnect(&mut self) -> Value {
-        json!({"type": "handle_disconnect", "polkavm": true})
-    }
-
-    fn handle_configuration_done(&mut self) -> Value {
-        json!({"type": "handle_configuration_done", "polkavm": true})
-    }
-
-    fn handle_set_breakpoints(&mut self, lines: Vec<usize>) -> Value {
-        json!({"type": "handle_set_breakpoints", "polkavm": true})
-    }
-
-    fn handle_continue(&mut self) -> Value {
-        json!({"type": "handle_continue", "polkavm": true})
-    }
-
-    fn handle_next(&mut self) -> Value {
-        json!({"type": "handle_next", "polkavm": true})
-    }
-
-    fn handle_step_in(&mut self) -> Value {
-        json!({"type": "handle_step_in", "polkavm": true})
-    }
-
-    fn handle_step_out(&mut self) -> Value {
-        json!({"type": "handle_step_out", "polkavm": true})
-    }
-
-    fn handle_pause(&mut self) -> Value {
-        json!({"type": "handle_pause", "polkavm": true})
-    }
-
-    fn handle_threads(&mut self) -> Value {
-        json!({"type": "handle_threads", "polkavm": true})
-    }
-
-    fn handle_stack_trace(&mut self) -> Value {
-        json!({"type": "handle_stack_trace", "polkavm": true})
-    }
-
-    fn handle_scopes(&mut self) -> Value {
-        json!({"type": "handle_scopes", "polkavm": true})
-    }
-
-    fn handle_variables(&mut self) -> Value {
-        json!({"type": "handle_variables", "polkavm": true})
-    }
-
-    fn handle_unknown(&mut self, command: String) -> Value {
-        json!({"type": "handle_unknown", "polkavm": true})
-    }
-}
-
 impl From<&mut BufReader<StdinLock<'_>>> for DapCommand {
     fn from(reader: &mut BufReader<StdinLock>) -> Self {
         let mut line = String::new();
@@ -172,7 +96,7 @@ impl From<&mut BufReader<StdinLock<'_>>> for DapCommand {
         let request = serde_json::from_str::<DapRequest>(&line).unwrap();
 
         match request.command.as_str() {
-            "initialize" => Initialize(request.arguments.map(|a| a.path.unwrap())),
+            "initialize" => Initialize(request.arguments.map(|args| args.path.unwrap())),
             "launch" => Launch,
             "disconnect" => Disconnect,
             "configurationDone" => ConfigurationDone,

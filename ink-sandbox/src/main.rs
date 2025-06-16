@@ -1,10 +1,12 @@
-use crate::api::{dispatch_command, CliHandler, DapCommand};
+use crate::api::{dispatch_command, DapCommand};
+use crate::dap_handler::CliHandler;
 use std::io::{BufReader, Read, Write};
 use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::Mutex;
 
 mod api;
+mod dap_handler;
 mod sandbox;
 mod utils;
 
@@ -17,7 +19,8 @@ fn main() {
 
     loop {
         let api = DapCommand::from(reader.as_ref().lock().unwrap().deref_mut());
-        let result = dispatch_command(&mut CliHandler::new(), api);
+        let mut handler = CliHandler::new();
+        let result = dispatch_command(&mut handler, api.clone());
 
         writeln!(stdout, "{}", result).unwrap();
         stdout.flush().unwrap();
