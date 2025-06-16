@@ -43,6 +43,7 @@ jobs:
         run: cargo build --release --target ${{ matrix.target }}
 
       - name: Copy to bin/ink-sandbox
+        shell: bash
         run: |
           mkdir -p bin/ink-sandbox
           cp ink-sandbox/target/${{ matrix.target }}/release/ink-sandbox${{ matrix.ext }} bin/ink-sandbox/ink-sandbox-${{ matrix.target }}${{ matrix.ext }}
