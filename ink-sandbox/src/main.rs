@@ -4,6 +4,7 @@ use std::io::{BufReader, Read, Write};
 use std::ops::DerefMut;
 use std::rc::Rc;
 use std::sync::Mutex;
+use crate::api::DapCommand::Disconnect;
 
 mod api;
 mod dap_handler;
@@ -23,6 +24,9 @@ fn main() {
         let result = dispatch_command(&mut handler, api.clone());
 
         writeln!(stdout, "{}", result).unwrap();
+        if api == Disconnect {
+            break;
+        }
         stdout.flush().unwrap();
     }
 }

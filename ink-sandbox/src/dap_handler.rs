@@ -1,7 +1,6 @@
+use crate::api::DapResponse;
 use crate::sandbox::Sandbox;
 use crate::utils::find_polkavm;
-use serde_json::{json, Value};
-use crate::api::DapResponse;
 
 pub struct CliHandler {
     sandbox: Option<Sandbox>,
@@ -52,7 +51,9 @@ impl DapHandler<DapResponse> for CliHandler {
     }
 
     fn handle_disconnect(&mut self) -> DapResponse {
-        DapResponse::new("initialize", true)
+        let mut response = DapResponse::new("disconnect", true);
+        response.set_message("Disconnected from server");
+        response
     }
 
     fn handle_configuration_done(&mut self) -> DapResponse {
