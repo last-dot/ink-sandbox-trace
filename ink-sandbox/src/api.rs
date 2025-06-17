@@ -8,6 +8,7 @@ use std::io::{BufRead, BufReader, StdinLock};
 #[derive(Debug, Deserialize)]
 struct DapRequestArgs {
     path: Option<String>,
+    breakpoints: Option<Vec<usize>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -18,7 +19,7 @@ struct DapRequest {
     arguments: Option<DapRequestArgs>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq)]
 pub(crate) struct DapResponse {
     pub(crate) command: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -97,7 +98,7 @@ impl From<&mut BufReader<StdinLock<'_>>> for DapCommand {
             "initialize" => Initialize(request.arguments.map(|args| args.path.unwrap())),
             "disconnect" => Disconnect,
             "configurationDone" => ConfigurationDone,
-            "setBreakpoints" => SetBreakpoints(Vec::new()),
+            "setBreakpoints" => SetBreakpoints(request.arguments.and_then(|args| args.breakpoints).unwrap_or_default()),
             "continue" => Continue,
             "next" => Next,
             "stepIn" => StepIn,

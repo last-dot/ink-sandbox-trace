@@ -44,7 +44,7 @@ pub(crate) mod tests {
     use std::path::PathBuf;
 
     pub(crate) const SRC: &str = "ink-trace-extension/sampleWorkspace/lib.rs";
-    const POLKAVM_LOCATION: &str = "ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm";
+    pub(crate) const POLKAVM_LOCATION: &str = "ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm";
     const SRC_CONTRACT_LOCATION: &str = "ink-trace-extension/sampleWorkspace";
 
     #[test]

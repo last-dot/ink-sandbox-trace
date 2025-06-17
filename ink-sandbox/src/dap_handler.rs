@@ -39,13 +39,10 @@ impl DapHandler<DapResponse> for CliHandler {
                 .unwrap()
                 .to_string()
         } else {
-            String::new()
+            return DapResponse::new("initialize", false);
         };
         self.sandbox =
             Some(Sandbox::from_uri(polkavm.as_str()).expect("Could not create the sandbox"));
-        if let Some(sandbox) = &mut self.sandbox {
-            sandbox.enable_step_tracing();
-        }
 
         DapResponse::new("initialize", true)
     }
@@ -65,7 +62,7 @@ impl DapHandler<DapResponse> for CliHandler {
     }
 
     fn handle_continue(&mut self) -> DapResponse {
-        DapResponse::new("initialize", true)
+        DapResponse::new("continue", true)
     }
 
     fn handle_next(&mut self) -> DapResponse {
@@ -89,7 +86,8 @@ impl DapHandler<DapResponse> for CliHandler {
     }
 
     fn handle_stack_trace(&mut self) -> DapResponse {
-        DapResponse::new("initialize", true)
+
+        DapResponse::new("stack_trace", true)
     }
 
     fn handle_scopes(&mut self) -> DapResponse {
@@ -101,8 +99,55 @@ impl DapHandler<DapResponse> for CliHandler {
     }
 
     fn handle_unknown(&mut self, command: String) -> DapResponse {
-        let mut response =  DapResponse::new(command.as_str(), false);
+        let mut response = DapResponse::new(command.as_str(), false);
         response.set_message("Unknown command");
         response
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::api::DapResponse;
+    use crate::dap_handler::{CliHandler, DapHandler};
+    use crate::utils::tests::{get_root_dir, POLKAVM_LOCATION};
+
+    fn polkavm() -> String {
+        get_root_dir()
+            .join(POLKAVM_LOCATION)
+            .as_os_str()
+            .to_str()
+            .unwrap()
+            .to_string()
+    }
+
+    #[test]
+    fn test_initialize() {
+        let mut handler = CliHandler::new();
+        let polkavm = polkavm();
+        let response = handler.handle_initialize(Some(polkavm));
+        assert_eq!(response, DapResponse::new("initialize", true));
+
+        let response = handler.handle_initialize(None);
+        assert_eq!(response, DapResponse::new("initialize", false));
+    }
+
+    #[test]
+    #[should_panic(expected = "Could not find the polkavm file")]
+    fn test_initialize_panic() {
+        let mut handler = CliHandler::new();
+
+        handler.handle_initialize(Some(String::default()));
+    }
+
+    #[test]
+    fn test_handle_stack_trace() {
+        let mut handler = CliHandler::new();
+        let polkavm = polkavm();
+        handler.handle_initialize(Some(polkavm));
+        handler.handle_stack_trace();
+        assert_eq!(
+            handler.handle_stack_trace(),
+            DapResponse::new("stack_trace", true)
+        );
     }
 }

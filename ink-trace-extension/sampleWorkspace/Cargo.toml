@@ -22,5 +22,6 @@ ink-as-dependency = []
 e2e-tests = []
 
 [profile.release]
-debug = 2
+debug = true
+opt-level = 0
 strip = false
