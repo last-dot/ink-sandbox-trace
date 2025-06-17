@@ -1,6 +1,6 @@
 use std::fs;
 
-use polkavm::debug_info::{FrameKind, SourceCache};
+use polkavm::debug_info::FrameKind;
 use polkavm::{ArcBytes, ProgramBlob, ProgramCounter};
 
 pub type SandboxError = Box<dyn std::error::Error>;
@@ -17,12 +17,13 @@ impl Sandbox {
         let bytecode = fs::read(uri)?;
         let blob = ProgramBlob::parse(ArcBytes::from(bytecode))
             .map_err(|e| anyhow::anyhow!("Failed to parse program blob: {}", e))?;
-
         let config = polkavm::Config::new();
         let engine = polkavm::Engine::new(&config)?;
         let module_config = polkavm::ModuleConfig::new();
 
+
         let module = polkavm::Module::from_blob(&engine, &module_config, blob.clone())?;
+
         Ok(Sandbox {
             blob,
             engine,
@@ -54,7 +55,8 @@ impl Sandbox {
                     for frame in region_info.frames() {
                         if frame.kind() == FrameKind::Line {
                             if let Ok(Some(location)) = frame.location() {
-                                let function_name = frame.function_name_without_namespace()
+                                let function_name = frame
+                                    .function_name_without_namespace()
                                     .ok()
                                     .flatten()
                                     .map(|s| s.to_string());
