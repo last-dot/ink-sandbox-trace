@@ -1,3 +1,4 @@
+use polkavm::ProgramCounter;
 use crate::api::DapResponse;
 use crate::sandbox::Sandbox;
 use crate::utils::find_polkavm;
@@ -86,7 +87,10 @@ impl DapHandler<DapResponse> for CliHandler {
     }
 
     fn handle_stack_trace(&mut self) -> DapResponse {
-
+        // export: call @ ProgramCounter(886)
+        // export: deploy @ ProgramCounter(1211)
+        let sandbox = self.sandbox.as_mut().unwrap();
+        sandbox.get_source_location_for_pc(ProgramCounter(0));
         DapResponse::new("stack_trace", true)
     }
 

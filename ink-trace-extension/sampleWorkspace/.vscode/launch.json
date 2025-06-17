@@ -3,7 +3,7 @@
 	"configurations": [
 		{
 			"type": "ink-trace",
-			"request": "attach",
+			"request": "launch",
 			"name": "Debug ink!"
 		}
 	]

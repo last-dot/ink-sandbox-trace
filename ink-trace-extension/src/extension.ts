@@ -8,12 +8,10 @@ import {
     OutputEvent,
     Source,
     StackFrame,
-    ContinuedEvent,
     TerminatedEvent
 } from '@vscode/debugadapter';
 import { DebugProtocol } from '@vscode/debugprotocol';
 import * as path from 'path';
-import { PolkaVMI } from './polkaVMInstructions';
 import * as process from 'process';
 
 export function activate(context: vscode.ExtensionContext) {
@@ -59,7 +57,6 @@ class InkDebugSession extends DebugSession {
 
     private _programPath: string | undefined;
 
-    private readonly instr: Map<number, string>;
     private _project = vscode.workspace.workspaceFolders?.[0]
         ? path.basename(vscode.workspace.workspaceFolders[0].uri.fsPath)
         : 'unknown_project';
@@ -69,7 +66,6 @@ class InkDebugSession extends DebugSession {
         console.log('[ink-trace] InkDebugSession started');
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
-        this.instr = new PolkaVMI().load();
     }
     
     private normalizePath(filePath: string): string {
