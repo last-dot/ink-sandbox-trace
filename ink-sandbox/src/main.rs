@@ -1,4 +1,4 @@
-use crate::api::dispatch_request;
+use crate::api::{dispatch_request, DapCommand};
 use crate::constants::messages::{STD_OUT_ERROR, STD_OUT_FLUSH_ERROR};
 use crate::dap_handler::CliHandler;
 use crate::domain::rpc::JsonRpcRequest;
@@ -13,7 +13,6 @@ mod dap_handler;
 mod domain;
 mod sandbox;
 
-// {"jsonrpc":"2.0","method":"initialize","params":{"polkavm":"/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm"},"id":"1"}
 fn main() {
     let stdin = std::io::stdin();
     let mut stdout = std::io::stdout();
@@ -22,7 +21,13 @@ fn main() {
     loop {
         let request = JsonRpcRequest::from(reader.as_ref().lock().unwrap().deref_mut());
         let mut handler = CliHandler::new();
-        let result = dispatch_request(&mut handler, request);
+        let result = dispatch_request(&mut handler, &request);
+
+        if let Ok(r) = &request {
+            if DapCommand::from(r) == DapCommand::Disconnect {
+                break;
+            }
+        }
 
         writeln!(stdout, "{}", result.clone().with_default_headers()).expect(STD_OUT_ERROR);
         stdout.flush().expect(STD_OUT_FLUSH_ERROR);

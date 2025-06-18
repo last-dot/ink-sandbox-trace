@@ -45,7 +45,7 @@ pub(crate) mod rpc {
         pub fn from(reader: &mut BufReader<StdinLock>) -> Result<Self, SandboxError> {
             let mut line = String::new();
             if reader.read_line(&mut line).unwrap() == 0 {
-                panic!("{}", EOF);
+                Err(SandboxError::from(EOF))?
             };
 
             let request = serde_json::from_str::<JsonRpcRequest>(&line)?;
@@ -130,13 +130,13 @@ pub(crate) mod params {
 
     #[derive(Serialize, Debug, Clone, PartialEq, Eq)]
     pub(crate) struct ResultMsg {
-        pub result: String,
+        pub message: String,
     }
 
     impl ResultMsg {
         pub fn new(result: &str) -> Self {
             ResultMsg {
-                result: result.to_string(),
+                message: result.to_string(),
             }
         }
     }
