@@ -1,29 +1,26 @@
+import { OutputEvent } from '@vscode/debugadapter';
+
 export class Logger {
-    private static debugMode = false;
+    private sendEvent: (event: OutputEvent) => void;
 
-    public static enableDebug() {
-        Logger.debugMode = true;
+    constructor(sendEvent: (event: OutputEvent) => void) {
+        this.sendEvent = sendEvent;
     }
 
-    public static disableDebug() {
-        Logger.debugMode = false;
+    info(message: string): void {
+        this.log('info', message);
     }
 
-    public static log(message: string, ...optionalParams: any[]) {
-        if (Logger.debugMode) {
-            console.log(`[ink-trace LOG] ${message}`, ...optionalParams);
-        }
+    debug(message: string): void {
+        this.log('debug', message);
     }
 
-    public static warn(message: string, ...optionalParams: any[]) {
-        if (Logger.debugMode) {
-            console.warn(`[ink-trace WARN] ${message}`, ...optionalParams);
-        }
+    error(message: string): void {
+        this.log('error', message);
     }
 
-    public static error(message: string, ...optionalParams: any[]) {
-        if (Logger.debugMode) {
-            console.error(`[ink-trace ERROR] ${message}`, ...optionalParams);
-        }
+    private log(level: 'info' | 'debug' | 'error', message: string): void {
+        const prefix = `[${level.toUpperCase()}] `;
+        this.sendEvent(new OutputEvent(prefix + message + '\n'));
     }
 }
