@@ -1,5 +1,3 @@
-// src/inkDebugSession.ts
-
 import {
     DebugSession,
     InitializedEvent,
@@ -22,13 +20,13 @@ export class InkDebugSession extends DebugSession {
     private _activeBreakpoints: DebugProtocol.Breakpoint[] = [];
     private _currentBreakpointIndex = 0;
     private _programPath: string | undefined;
+    private _logger: Logger;
 
     public constructor() {
         super();
         this.setDebuggerLinesStartAt1(true);
         this.setDebuggerColumnsStartAt1(true);
-
-        Logger.enableDebug();
+        this._logger = new Logger(this.sendEvent.bind(this));
     }
 
     private normalizePath(filePath: string): string {
@@ -46,7 +44,7 @@ export class InkDebugSession extends DebugSession {
     }
 
     protected launchRequest(response: DebugProtocol.LaunchResponse, args: DebugProtocol.LaunchRequestArguments & { program?: string }): void {
-        this.sendEvent(new OutputEvent(`[ink-trace] Initializing debug session for: ${args.program}\n`));
+        this._logger.info(`Initializing debug session for: ${args.program}`);
         if (args.program) {
             this._programPath = this.normalizePath(args.program);
         }
@@ -62,7 +60,7 @@ export class InkDebugSession extends DebugSession {
         }
 
         const normalizedPath = this.normalizePath(filePath);
-        Logger.log(`Setting breakpoints for key: "${normalizedPath}"`);
+        this._logger.debug(`Setting breakpoints for key: "${normalizedPath}"`);
 
         const newBreakpoints = (args.breakpoints ?? [])
             .map(bp => new Breakpoint(true, bp.line, bp.column, new Source(path.basename(normalizedPath), normalizedPath)) as DebugProtocol.Breakpoint)
@@ -71,7 +69,7 @@ export class InkDebugSession extends DebugSession {
         this._breakpointMap.set(normalizedPath, newBreakpoints);
 
         response.body = { breakpoints: newBreakpoints };
-        this.sendEvent(new OutputEvent(`[ink-trace] Set ${newBreakpoints.length} breakpoints in file: ${normalizedPath}\n`));
+        this._logger.info(`Set ${newBreakpoints.length} breakpoints in file: ${normalizedPath}`);
         this.sendResponse(response);
     }
 
@@ -79,40 +77,40 @@ export class InkDebugSession extends DebugSession {
         super.configurationDoneRequest(response, args);
 
         if (!this._programPath) {
-            this.sendEvent(new OutputEvent('Error: No program path was configured.\n', 'stderr'));
+            this._logger.error('No program path was configured.');
             this.sendEvent(new TerminatedEvent());
             return;
         }
 
-        Logger.log(`Looking for breakpoints with key: "${this._programPath}"`);
+        this._logger.debug(`Looking for breakpoints with key: "${this._programPath}"`);
         this._activeBreakpoints = this._breakpointMap.get(this._programPath) || [];
-        Logger.log(`Breakpoint map contains keys:`, Array.from(this._breakpointMap.keys()));
-        Logger.log(`Found ${this._activeBreakpoints.length} active breakpoints.`);
+        this._logger.debug(`Breakpoint map contains keys: ${JSON.stringify(Array.from(this._breakpointMap.keys()))}`);
+        this._logger.debug(`Found ${this._activeBreakpoints.length} active breakpoints.`);
 
         if (this._activeBreakpoints.length > 0) {
             this._currentBreakpointIndex = 0;
             const bp = this._activeBreakpoints[this._currentBreakpointIndex];
-            this.sendEvent(new OutputEvent(`Stopped on entry or first breakpoint. Line: ${bp.line}\n`, 'console'));
+            this._logger.info(`Stopped on entry or first breakpoint. Line: ${bp.line}`);
             this.sendEvent(new StoppedEvent('breakpoint', InkDebugSession.THREAD_ID));
         } else {
-            this.sendEvent(new OutputEvent(`No breakpoints in ${this._programPath}. Finishing debug session.\n`, 'console'));
+            this._logger.info(`No breakpoints in ${this._programPath}. Finishing debug session.`);
             this.sendEvent(new TerminatedEvent());
         }
     }
 
     protected continueRequest(response: DebugProtocol.ContinueResponse, args: DebugProtocol.ContinueArguments): void {
-        this.sendEvent(new OutputEvent('Continued to the end. Program finished.\n', 'console'));
+        this._logger.info('Continued to the end. Program finished.');
         this.sendEvent(new TerminatedEvent());
         this.sendResponse(response);
     }
 
     protected pauseRequest(response: DebugProtocol.PauseResponse, args: DebugProtocol.PauseArguments): void {
-        this.sendEvent(new OutputEvent('[ink-trace] Pause request received (no-op in this simulator).\n', 'console'));
+        this._logger.info('Pause request received (no-op in this simulator).');
         this.sendResponse(response);
     }
 
     protected disconnectRequest(response: DebugProtocol.DisconnectResponse, args: DebugProtocol.DisconnectArguments): void {
-        this.sendEvent(new OutputEvent('[ink-trace] Disconnecting debugger.\n', 'console'));
+        this._logger.info('Disconnecting debugger.');
         super.disconnectRequest(response, args);
     }
 
@@ -120,10 +118,10 @@ export class InkDebugSession extends DebugSession {
         this._currentBreakpointIndex++;
         if (this._currentBreakpointIndex < this._activeBreakpoints.length) {
             const bp = this._activeBreakpoints[this._currentBreakpointIndex];
-            this.sendEvent(new OutputEvent(`Stepped. Stopped at breakpoint. Line: ${bp.line}\n`, 'console'));
+            this._logger.info(`Stepped. Stopped at breakpoint. Line: ${bp.line}`);
             this.sendEvent(new StoppedEvent('step', InkDebugSession.THREAD_ID));
         } else {
-            this.sendEvent(new OutputEvent('End of breakpoints. Program finished.\n', 'console'));
+            this._logger.info('End of breakpoints. Program finished.');
             this.sendEvent(new TerminatedEvent());
         }
         this.sendResponse(response);
