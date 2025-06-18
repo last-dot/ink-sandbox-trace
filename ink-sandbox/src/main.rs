@@ -19,12 +19,12 @@ fn main() {
     let reader = Rc::new(Mutex::new(BufReader::new(stdin.lock())));
 
     loop {
-        let request = JsonRpcRequest::from(reader.as_ref().lock().unwrap().deref_mut());
+        let request = JsonRpcRequest::try_from(reader.as_ref().lock().unwrap().deref_mut());
         let mut handler = CliHandler::new();
         let result = dispatch_request(&mut handler, &request);
 
-        if let Ok(r) = &request {
-            if DapCommand::from(r) == DapCommand::Disconnect {
+        if let Ok(req) = &request {
+            if req.method == "disconnect" {
                 break;
             }
         }

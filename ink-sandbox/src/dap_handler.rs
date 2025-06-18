@@ -1,5 +1,4 @@
 use crate::constants::messages::POLKAVM_FILE_NOT_FOUND;
-use crate::domain::params::ResultMsg;
 use crate::domain::rpc::JsonRpcResponse;
 use crate::sandbox::{Sandbox, SandboxError};
 use serde_json::json;
@@ -30,7 +29,10 @@ impl DapHandler<JsonRpcResponse> for CliHandler {
     ) -> Result<JsonRpcResponse, SandboxError> {
         let response = if let Some(path) = polkavm_path {
             self.sandbox = Some(Sandbox::from_uri(path.as_str())?);
-            JsonRpcResponse::result(json!(ResultMsg::new("initialized")), None)
+            JsonRpcResponse::result(json!({
+                "status": "initialized",
+                "version": env!("CARGO_PKG_VERSION")
+            }), None)
         } else {
             JsonRpcResponse::error(POLKAVM_FILE_NOT_FOUND, None)
         };
@@ -43,6 +45,10 @@ impl DapHandler<JsonRpcResponse> for CliHandler {
     }
 
     fn handle_pause(&mut self) -> Result<JsonRpcResponse, SandboxError> {
+        if let Some(sandbox) = &self.sandbox {
+            sandbox.selectors();
+        }
+
         Ok(JsonRpcResponse::default())
     }
 
@@ -59,5 +65,21 @@ impl DapHandler<JsonRpcResponse> for CliHandler {
             format!("Unknown command: {}", command).as_str(),
             None,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sandbox::Sandbox;
+
+    #[test]
+    fn test_handle_pause_with_sandbox() {
+        let mut handler = CliHandler::new();
+        handler.sandbox = Some(Sandbox::from_uri("/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm").unwrap());
+
+        let response = handler.handle_pause();
+
+        assert!(response.is_ok(), "Expected Ok response");
     }
 }
