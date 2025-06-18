@@ -1,10 +1,12 @@
 {
-	"version": "0.2.0",
-	"configurations": [
-		{
-			"type": "ink-trace",
-			"request": "launch",
-			"name": "Debug ink!"
-		}
-	]
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "ink-trace",
+      "request": "launch",
+      "name": "Ink Trace Launch",
+      "program": "${file}",
+      "stopOnEntry": true
+    }
+  ]
 }
