@@ -21,7 +21,11 @@ std = [
 ink-as-dependency = []
 e2e-tests = []
 
+[profile.dev]
+debug = true                # Включает отладочную информацию (значение по умолчанию)
+debug-assertions = true     # Включает assert'ы для отладки
+
 [profile.release]
-debug = true
-opt-level = 0
-strip = false
+debug = true                # Включает отладочную информацию (значение по умолчанию)
+debug-assertions = true     # Включает assert'ы для отладки
+

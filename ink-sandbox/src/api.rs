@@ -1,114 +1,85 @@
-use std::fmt::{Display, Formatter};
 use crate::api::DapCommand::*;
 use crate::dap_handler::DapHandler;
-use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
-use std::io::{BufRead, BufReader, StdinLock};
+use crate::domain::params::InitParams;
+use crate::domain::rpc::{JsonRpcRequest, JsonRpcResponse};
+use crate::sandbox::SandboxError;
 
-#[derive(Debug, Deserialize)]
-struct DapRequestArgs {
-    path: Option<String>,
-    breakpoints: Option<Vec<usize>>,
-}
-
-#[derive(Debug, Deserialize)]
-struct DapRequest {
-    #[serde(rename = "type")]
-    typ: String,
-    command: String,
-    arguments: Option<DapRequestArgs>,
-}
-
-#[derive(Debug, Serialize, PartialEq)]
-pub(crate) struct DapResponse {
-    pub(crate) command: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) message: Option<String>,
-    pub(crate) status: bool,
-}
-
-impl DapResponse {
-    pub(crate) fn new(command: &str, status: bool) -> Self {
-        DapResponse {
-            command: command.to_string(),
-            message: None,
-            status,
-        }
-    }
-
-    pub(crate) fn set_message(&mut self, message: &str) {
-        self.message = Some(message.to_string());
-    }
-}
-
-impl Display for DapResponse {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let j = json!(self);
-        write!(f, "{}", j)
-    }
-}
+pub type RpcRequest = Result<JsonRpcRequest, SandboxError>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum DapCommand {
-    Initialize(Option<String>), // Инициализация отладчика
-    Disconnect,                 // Отключение отладчика
-    ConfigurationDone,          // Завершение конфигурации
-    SetBreakpoints(Vec<usize>), // Установка брейкпоинтов
-    Continue,                   // Продолжить выполнение
-    Next,                       // Step Over (шаг через)
-    StepIn,                     // Step In (шаг внутрь)
-    StepOut,                    // Step Out (шаг наружу)
-    Pause,                      // Приостановить выполнение
-    Threads,                    // Список потоков (один поток)
-    StackTrace,                 // Стек вызовов
-    Scopes,                     // Области видимости переменных
-    Variables,                  // Переменные
-    Unknown(String),            // Любая неподдерживаемая команда
+    //{"jsonrpc": "2.0", "method": "initialize", "params": {"polkavm": "/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm"}, "id": "1"}
+    //Content-Length: 123\r\n\r\n{"jsonrpc": "2.0", "method": "initialize", "params": {"path": "/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm"}, "id": 1}
+    Initialize(Option<InitParams>), // Инициализация отладчика
+    // {"jsonrpc": "2.0", "method": "pause", "id": "2"}
+    Pause, // Приостановить выполнение
+    // {"jsonrpc": "2.0", "method": "continue", "id": "3"}
+    Continue, // Продолжить выполнение
+    // {"jsonrpc": "2.0", "method": "disconnect", "id": "4"}
+    Disconnect, // Отключение отладчика
+    // {"jsonrpc": "2.0", "method": "next", "id": "5"}
+    Next, // Шаг через (Step Over)
+
+    // ConfigurationDone,          // Завершение конфигурации
+    // SetBreakpoints(Vec<usize>), // Установка брейкпоинтов
+    // StepIn,                     // Step In (шаг внутрь)
+    // StepOut,                    // Step Out (шаг наружу)
+    // Threads,                    // Список потоков (один поток)
+    // StackTrace,                 // Стек вызовов
+    // Scopes,                     // Области видимости переменных
+    // Variables,                  // Переменные
+    Unknown(String), // Любая неподдерживаемая команда
 }
 
-pub fn dispatch_command<T, H: DapHandler<T>>(handler: &mut H, command: DapCommand) -> T {
-    match command {
-        Initialize(path) => handler.handle_initialize(path),
-        Disconnect => handler.handle_disconnect(),
-        ConfigurationDone => handler.handle_configuration_done(),
-        SetBreakpoints(lines) => handler.handle_set_breakpoints(lines),
-        Continue => handler.handle_continue(),
-        Next => handler.handle_next(),
-        StepIn => handler.handle_step_in(),
-        StepOut => handler.handle_step_out(),
-        Pause => handler.handle_pause(),
-        Threads => handler.handle_threads(),
-        StackTrace => handler.handle_stack_trace(),
-        Scopes => handler.handle_scopes(),
-        Variables => handler.handle_variables(),
-        Unknown(name) => handler.handle_unknown(name),
+pub fn dispatch_request<H: DapHandler<JsonRpcResponse>>(
+    handler: &mut H,
+    json_rpc_request: &RpcRequest,
+) -> JsonRpcResponse {
+    match json_rpc_request {
+        Ok(request) => {
+            let req = request.as_command();
+            if let Err(err) = &req {
+                return JsonRpcResponse::error(err.to_string().as_str(), request.id);
+            }
+            let req = req.unwrap();
+            let response = match req {
+                Initialize(path) => handler.handle_initialize(path.map(|x| x.polkavm)),
+                Disconnect => handler.handle_disconnect(),
+                Continue => handler.handle_continue(),
+                Next => handler.handle_next(),
+                Pause => handler.handle_pause(),
+                Unknown(name) => handler.handle_unknown(name),
+            };
+
+            match response {
+                Ok(mut result) => {
+                    if let Some(id) = &request.id {
+                        result.set_request_id(*id);
+                    }
+                    result
+                }
+                Err(err) => JsonRpcResponse::error(err.to_string().as_str(), request.clone().id),
+            }
+        }
+        Err(err) => JsonRpcResponse::error(err.to_string().as_str(), None),
     }
 }
 
-impl From<&mut BufReader<StdinLock<'_>>> for DapCommand {
-    fn from(reader: &mut BufReader<StdinLock>) -> Self {
-        let mut line = String::new();
-        if reader.read_line(&mut line).unwrap() == 0 {
-            return Unknown(String::from("EOF"));
-        };
+impl TryFrom<&JsonRpcRequest> for DapCommand {
+    type Error = SandboxError;
 
-        let request = serde_json::from_str::<DapRequest>(&line).unwrap();
-
-        match request.command.as_str() {
-            "initialize" => Initialize(request.arguments.map(|args| args.path.unwrap())),
-            "disconnect" => Disconnect,
-            "configurationDone" => ConfigurationDone,
-            "setBreakpoints" => SetBreakpoints(request.arguments.and_then(|args| args.breakpoints).unwrap_or_default()),
-            "continue" => Continue,
-            "next" => Next,
-            "stepIn" => StepIn,
-            "stepOut" => StepOut,
-            "pause" => Pause,
-            "threads" => Threads,
-            "stackTrace" => StackTrace,
-            "scopes" => Scopes,
-            "variables" => Variables,
-            other => Unknown(other.to_string()),
+    fn try_from(req: &JsonRpcRequest) -> Result<Self, Self::Error> {
+        match req.method.as_str() {
+            "initialize" => {
+                let init_params = InitParams::try_from(req)?;
+                Ok(Initialize(Some(init_params)))
+            }
+            "pause" => Ok(Pause),
+            "continue" => Ok(Continue),
+            "disconnect" => Ok(Disconnect),
+            "next" => Ok(Next),
+            other => Ok(Unknown(other.to_string())),
         }
     }
 }
+
