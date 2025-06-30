@@ -12,7 +12,7 @@ def setup_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     Установка цветного регистратора для отладочного адаптера,
 
     Args:
-     name: Имя логгера
+     name: Имя логера
      level: Уровень ведения журнала
 
     Возвращает:

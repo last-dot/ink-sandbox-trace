@@ -1,112 +1,139 @@
 """
-Реализация протокола отладочного адаптера (DAP)
-Обрабатывает низкоуровневое чтение и запись сообщений DAP
+Debug Adapter Protocol (DAP) implementation
+Handles low-level DAP message reading and writing
 """
 
 import json
 import sys
+import os
 from typing import Dict, Any, Optional
 import logging
 
 
 class DAPProtocol:
-    """Занимается кодированием/декодированием сообщений DAP через stdin/stdout."""
+    """Handles DAP message encoding/decoding over stdin/stdout."""
 
     def __init__(self):
         self.logger = logging.getLogger("InkDebugAdapter.DAPProtocol")
         self._sequence = 1
 
+        # Set stdin to non-blocking mode on Windows
+        if sys.platform == 'win32':
+            import msvcrt
+            msvcrt.setmode(sys.stdin.fileno(), os.O_BINARY)
+            msvcrt.setmode(sys.stdout.fileno(), os.O_BINARY)
+
     def read_message(self) -> Optional[Dict[str, Any]]:
         """
-        Чтение DAP-сообщения из stdin.
+        Read a DAP message from stdin.
 
-        Формат сообщений DAP:
+        DAP messages format:
         Content-Length: <length>\r\n
-         \r\n
-         <json-content>.
+        \r\n
+        <json-content>
         """
         try:
-            # Чтение заголовков
-            headers = {}
+            # Read headers byte by byte until we find \r\n\r\n
+            headers_bytes = b''
             while True:
-                line = sys.stdin.readline()
-                if not line:
+                byte = sys.stdin.buffer.read(1)
+                if not byte:
                     return None
-
-                line = line.strip()
-                if not line:  # Пустая строка - отмечает конец заголовков
+                headers_bytes += byte
+                if headers_bytes.endswith(b'\r\n\r\n'):
                     break
 
-                key, value = line.split(":", 1)
-                headers[key.strip()] = value.strip()
+            # Parse headers
+            headers_str = headers_bytes[:-4].decode('utf-8')  # Remove \r\n\r\n
+            headers = {}
+            for line in headers_str.split('\r\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    headers[key.strip()] = value.strip()
 
-            # Получить длину содержимого
-            content_length = int(headers.get("Content-Length", 0))
-            if content_length == 0:
-                self.logger.error("Заголовок Content-Length не найден")
+            # Get content length
+            if 'Content-Length' not in headers:
+                self.logger.error("No Content-Length header found")
                 return None
 
-            # body
-            body = sys.stdin.read(content_length)
-            if not body:
+            content_length = int(headers['Content-Length'])
+
+            # Read exact number of bytes for body
+            body_bytes = b''
+            while len(body_bytes) < content_length:
+                chunk = sys.stdin.buffer.read(content_length - len(body_bytes))
+                if not chunk:
+                    break
+                body_bytes += chunk
+
+            if len(body_bytes) < content_length:
+                self.logger.error(f"Expected {content_length} bytes, got {len(body_bytes)}")
                 return None
 
-            # Парс JSON
-            message = json.loads(body)
-            self.logger.debug(f"Получено: {message}")
+            # Parse JSON
+            body_str = body_bytes.decode('utf-8')
+            message = json.loads(body_str)
+            self.logger.debug(f"Received: {message}")
             return message
 
         except Exception as e:
-            self.logger.error(f"Сообщение об ошибке: {e}")
+            self.logger.error(f"Error reading message: {e}", exc_info=True)
             return None
 
     def send_message(self, message: Dict[str, Any]):
-        """Отправка сообщения DAP в stdout."""
+        """Send a DAP message to stdout."""
         try:
             # Convert to JSON
-            body = json.dumps(message)
+            body = json.dumps(message, separators=(',', ':'))
+            body_bytes = body.encode('utf-8')
 
-            # Отправка заголовков и тела
-            content_length = len(body.encode('utf-8'))
-            sys.stdout.write(f"Content-Length: {content_length}\r\n\r\n")
-            sys.stdout.write(body)
-            sys.stdout.flush()
+            # Create header
+            header = f"Content-Length: {len(body_bytes)}\r\n\r\n"
+            header_bytes = header.encode('ascii')
 
-            self.logger.debug(f"Отправлено: {message}")
+            # Write header and body
+            sys.stdout.buffer.write(header_bytes)
+            sys.stdout.buffer.write(body_bytes)
+            sys.stdout.buffer.flush()
+
+            self.logger.debug(f"Sent: {message}")
 
         except Exception as e:
-            self.logger.error(f"Ошибка отправки сообщения: {e}")
+            self.logger.error(f"Error sending message: {e}", exc_info=True)
 
     def send_response(self, request: Dict[str, Any], body: Optional[Dict[str, Any]] = None, success: bool = True):
-        """Отправка ответа на запрос DAP"""
+        """Send a response to a DAP request."""
         response = {
+            "seq": self._next_seq(),
             "type": "response",
             "request_seq": request.get("seq", 0),
             "success": success,
-            "command": request.get("command", ""),
-            "seq": self._next_seq()
+            "command": request.get("command", "")
         }
 
-        if body:
+        if body is not None:
             response["body"] = body
+
+        if not success and body is None:
+            response["body"] = {}
 
         self.send_message(response)
 
     def send_event(self, event: str, body: Optional[Dict[str, Any]] = None):
-        """Отправка события DAP."""
+        """Send a DAP event."""
         message = {
+            "seq": self._next_seq(),
             "type": "event",
-            "event": event,
-            "seq": self._next_seq()
+            "event": event
         }
 
-        if body:
+        if body is not None:
             message["body"] = body
 
         self.send_message(message)
 
     def _next_seq(self) -> int:
-        """Получение следующего порядкового номера."""
+        """Get next sequence number."""
         seq = self._sequence
         self._sequence += 1
         return seq

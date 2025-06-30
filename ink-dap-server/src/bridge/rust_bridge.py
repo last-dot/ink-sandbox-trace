@@ -19,37 +19,24 @@ class RustBridge:
         self.process = None
         self.request_id = 1
         self.pending_requests = {}
+        self.reader = None
+        self.writer = None
 
-    async def start(self, contract_path: str, rust_debugger_path: Optional[str] = None):
-        """Запускаем процесс Rust."""
-        if not rust_debugger_path:
-            # TODO: Получить путь из конфигурации
-            rust_debugger_path = "./rust-debugger"
-
-        self.logger.info(f"Запуск Rust для контракта: {contract_path}")
+    async def start(self, host: str = "localhost", port: int = 9229):
+        """Подключаемся к Rust серверу по TCP."""
+        self.logger.info(f"Подключение к Rust серверу {host}:{port}")
 
         try:
-            self.process = await asyncio.create_subprocess_exec(
-                rust_debugger_path,
-                "--contract", contract_path,
-                "--json-rpc",
-                stdin=asyncio.subprocess.PIPE,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE
-            )
-
-            # Начинаем читать ответы
+            self.reader, self.writer = await asyncio.open_connection(host, port)
             asyncio.create_task(self._read_responses())
-
-            self.logger.info("Rust успешно запущен")
-
+            self.logger.info("Успешно подключились к Rust серверу")
         except Exception as e:
-            self.logger.error(f"Не удалось запустить Rust: {e}")
+            self.logger.error(f"Не удалось подключиться: {e}")
             raise
 
     async def call_method(self, method: str, params: Dict[str, Any]) -> Any:
         """Вызовим метод в Rust."""
-        if not self.process:
+        if not self.writer:
             raise RuntimeError("Отладчик Rust не запущен")
 
         request_id = self._next_id()
@@ -62,8 +49,8 @@ class RustBridge:
 
         # Send request
         request_json = json.dumps(request) + "\n"
-        self.process.stdin.write(request_json.encode())
-        await self.process.stdin.drain()
+        self.writer.write(request_json.encode())
+        await self.writer.drain()
 
         self.logger.debug(f"Отправлен запрос: {request}")
 
@@ -80,9 +67,9 @@ class RustBridge:
 
     async def _read_responses(self):
         """О процессе Rust."""
-        while self.process and self.process.returncode is None:
+        while self.reader:
             try:
-                line = await self.process.stdout.readline()
+                line = await self.reader.readline()
                 if not line:
                     break
 
