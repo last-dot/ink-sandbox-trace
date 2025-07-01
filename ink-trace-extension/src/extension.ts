@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { PythonDAPLauncher } from './pythonDAPLauncher';
+import { PythonDapLauncher } from './PythonDapLauncher';
 
 const outputChannel = vscode.window.createOutputChannel('Ink Trace Debugger');
 
@@ -10,7 +10,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.debug.registerDebugAdapterDescriptorFactory('ink-trace', factory),
-        
+
         vscode.debug.registerDebugConfigurationProvider('ink-trace', {
             provideDebugConfigurations(): vscode.ProviderResult<vscode.DebugConfiguration[]> {
                 return [
@@ -33,10 +33,10 @@ export function deactivate() {
 }
 
 class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
-    private readonly launcher: PythonDAPLauncher;
+    private readonly launcher: PythonDapLauncher;
 
     constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
-        this.launcher = new PythonDAPLauncher(context, channel);
+        this.launcher = new PythonDapLauncher(context, channel);
     }
 
     async createDebugAdapterDescriptor(
