@@ -4,59 +4,78 @@ import * as child_process from 'child_process';
 import * as fs from 'fs';
 
 export class PythonDAPLauncher {
-    private context: vscode.ExtensionContext;
+    private readonly context: vscode.ExtensionContext;
+    private readonly channel: vscode.OutputChannel;
 
-    constructor(context: vscode.ExtensionContext) {
+    constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
         this.context = context;
+        this.channel = channel;
     }
 
-    private async checkPythonInstallation(): Promise<string | null> {
-        const commands = process.platform === 'win32'
-            ? ['python', 'py']
+    public async getDAPExecutable(config: vscode.DebugConfiguration): Promise<vscode.DebugAdapterExecutable> {
+        this.channel.appendLine('Preparing to launch DAP server...');
+        
+        const pythonExecutable = await this.findPythonExecutable();
+        const serverScript = this.resolveMainScript();
+
+        const options: vscode.DebugAdapterExecutableOptions = {
+            cwd: path.dirname(serverScript),
+            env: {
+                ...process.env,
+                RUST_LOG: 'debug'
+            }
+        };
+
+        this.channel.appendLine(`Starting DAP server using: ${pythonExecutable} ${serverScript}`);
+        return new vscode.DebugAdapterExecutable(pythonExecutable, [serverScript], options);
+    }
+
+    private async findPythonExecutable(): Promise<string> {
+        this.channel.appendLine('Searching for Python 3 executable...');
+        const candidates = process.platform === 'win32' 
+            ? ['python', 'py'] 
             : ['python3', 'python'];
 
-        for (const cmd of commands) {
+        for (const cmd of candidates) {
             try {
-                await new Promise<void>((resolve, reject) => {
-                    child_process.exec(`${cmd} --version`, (err) => {
-                        if (err) reject(err);
-                        else resolve();
-                    });
-                });
+                await this.isCommandAvailable(`${cmd} --version`);
+                this.channel.appendLine(`Found available Python command: '${cmd}'`);
                 return cmd;
-            } catch {
-                continue;
+            } catch (error) {
+                this.channel.appendLine(`Command '${cmd}' not found or failed. Trying next...`);
             }
         }
 
-        return null;
+        const message = 'Python 3 was not found in your PATH. Please install it and ensure it is available in your terminal to proceed.';
+        vscode.window.showErrorMessage(message);
+        this.channel.appendLine(`Error: ${message}`);
+        throw new Error(message);
     }
 
-    async getDAPExecutable(sessionConfig: vscode.DebugConfiguration): Promise<vscode.DebugAdapterExecutable> {
-        const pythonCmd = await this.checkPythonInstallation();
-        if (!pythonCmd) {
-            const msg = "Python 3 not found in PATH.";
-            vscode.window.showErrorMessage(msg);
-            throw new Error(msg);
-        }
-
-        const scriptPath = path.join(this.context.extensionPath, 'ink-dap-server', 'main.py');
-        if (!fs.existsSync(scriptPath)) {
-            const msg = `main.py not found at: ${scriptPath}`;
-            vscode.window.showErrorMessage(msg);
-            throw new Error(msg);
-        }
-
-        return new vscode.DebugAdapterExecutable(
-            pythonCmd,
-            [scriptPath],
-            {
-                cwd: path.dirname(scriptPath),
-                env: {
-                    ...process.env,
-                    RUST_LOG: "debug"
+    private async isCommandAvailable(command: string): Promise<void> {
+        return new Promise((resolve, reject) => {
+            child_process.exec(command, (err) => {
+                if (err) {
+                    reject(err);
+                } else {
+                    resolve();
                 }
-            }
-        );
+            });
+        });
+    }
+
+    private resolveMainScript(): string {
+        const scriptPath = path.join(this.context.extensionPath, 'ink-dap-server', 'main.py');
+        this.channel.appendLine(`Checking for DAP server script at: ${scriptPath}`);
+
+        if (!fs.existsSync(scriptPath)) {
+            const message = `DAP server script not found at the expected location: ${scriptPath}`;
+            vscode.window.showErrorMessage(message);
+            this.channel.appendLine(`Error: ${message}`);
+            throw new Error(message);
+        }
+        
+        this.channel.appendLine('DAP server script found.');
+        return scriptPath;
     }
 }
