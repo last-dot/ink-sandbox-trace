@@ -3,7 +3,7 @@ import * as path from 'path';
 import * as child_process from 'child_process';
 import * as fs from 'fs';
 
-export class PythonDAPLauncher {
+export class PythonDapLauncher {
     private readonly context: vscode.ExtensionContext;
     private readonly channel: vscode.OutputChannel;
 
@@ -14,7 +14,7 @@ export class PythonDAPLauncher {
 
     public async getDAPExecutable(config: vscode.DebugConfiguration): Promise<vscode.DebugAdapterExecutable> {
         this.channel.appendLine('Preparing to launch DAP server...');
-        
+
         const pythonExecutable = await this.findPythonExecutable();
         const serverScript = this.resolveMainScript();
 
@@ -32,17 +32,14 @@ export class PythonDAPLauncher {
 
     private async findPythonExecutable(): Promise<string> {
         this.channel.appendLine('Searching for Python 3 executable...');
-        const candidates = process.platform === 'win32' 
-            ? ['python', 'py'] 
+        const candidates = process.platform === 'win32'
+            ? ['python', 'py']
             : ['python3', 'python'];
 
         for (const cmd of candidates) {
-            try {
-                await this.isCommandAvailable(`${cmd} --version`);
+            if (await this.isCommandAvailable(`${cmd} --version`)) {
                 this.channel.appendLine(`Found available Python command: '${cmd}'`);
                 return cmd;
-            } catch (error) {
-                this.channel.appendLine(`Command '${cmd}' not found or failed. Trying next...`);
             }
         }
 
@@ -52,14 +49,10 @@ export class PythonDAPLauncher {
         throw new Error(message);
     }
 
-    private async isCommandAvailable(command: string): Promise<void> {
-        return new Promise((resolve, reject) => {
+    private async isCommandAvailable(command: string): Promise<boolean> {
+        return new Promise((resolve) => {
             child_process.exec(command, (err) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve();
-                }
+                resolve(!err);
             });
         });
     }
@@ -74,7 +67,7 @@ export class PythonDAPLauncher {
             this.channel.appendLine(`Error: ${message}`);
             throw new Error(message);
         }
-        
+
         this.channel.appendLine('DAP server script found.');
         return scriptPath;
     }
