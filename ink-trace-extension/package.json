@@ -1,16 +1,15 @@
 {
   "name": "ink-trace-extension",
-  "displayName": "ink-trace-extension",
-  "description": "Debugger for smart contracts for ink!",
+  "displayName": "Ink Trace Debugger",
+  "description": "Debugger for ink! smart contracts",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Debuggers"
-  ],
+  "categories": ["Debuggers"],
   "activationEvents": [
-    "onDebug"
+    "onDebug",
+    "onCommand:ink-trace.startDebugging"
   ],
   "main": "./out/extension.js",
   "scripts": {
@@ -26,47 +25,67 @@
       {
         "type": "ink-trace",
         "label": "Ink Trace Debug",
-        "languages": [
-          "rust"
+        "program": "./out/extension.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Path to compiled contract.wasm"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "default": true,
+                "description": "Break at the beginning of the contract"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Additional arguments for the contract"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ink-trace",
+            "request": "launch",
+            "name": "Debug Ink Contract",
+            "program": "${file}",
+            "stopOnEntry": true,
+            "args": []
+          }
         ],
         "configurationSnippets": [
           {
-            "label": "Ink Trace: Launch",
-            "description": "Launch and debug a file with Ink Trace.",
+            "label": "Ink Trace: Launch Contract",
+            "description": "Debug an ink! smart contract",
             "body": {
               "type": "ink-trace",
               "request": "launch",
-              "name": "Ink Trace Launch",
+              "name": "Debug Ink Contract",
               "program": "${file}",
               "stopOnEntry": true
             }
           }
-        ],
-        "configurationAttributes": {
-          "launch": {
-            "required": [
-              "program"
-            ],
-            "properties": {
-              "program": {
-                "type": "string",
-                "description": "Absolute path to the program file to debug.",
-                "default": "${file}"
-              },
-              "stopOnEntry": {
-                "type": "boolean",
-                "description": "Automatically stop the debugger after launch.",
-                "default": true
-              }
-            }
-          }
-        }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "ink-trace.startDebugging",
+        "title": "Start Ink! Debugging",
+        "category": "Ink! Trace"
       }
     ]
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
-    "@types/node": "20.x",
+    "@types/node": "^20.19.2",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
