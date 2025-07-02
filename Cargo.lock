@@ -1007,6 +1007,8 @@ dependencies = [
  "proptest",
  "regalloc2",
  "rustc-demangle",
+ "serde",
+ "serde_json",
  "yansi",
 ]
 

@@ -973,6 +973,7 @@ where
 
     // These should already be sorted, but sort them anyway.
     lines.sort_by_key(|entry| entry.target.offset);
+    log::debug!("Parsed {} line entries for unit", lines.len());
 
     Ok(lines)
 }
@@ -1039,13 +1040,17 @@ impl<'a, R> DwarfWalker<'a, R>
 where
     R: gimli::Reader,
 {
-    fn run(mut self) -> Result<HashMap<SectionTarget, Arc<[Location]>>, ProgramFromElfError> {
+    fn run(mut self) -> Result<(HashMap<SectionTarget, Arc<[Location]>>, HashMap<SectionTarget, SourceCodeLocation>), ProgramFromElfError> {
         let mut lines_for_unit: Vec<Vec<LineEntry>> = Vec::new();
         let mut subprograms_for_unit: Vec<Vec<SubProgram<R>>> = Vec::new();
         let mut subprogram_offset_to_namespace: HashMap<gimli::DebugInfoOffset<R::Offset>, Option<Arc<str>>> = Default::default();
         let mut function_line_boundaries_for_file: BTreeMap<Arc<str>, Vec<u32>> = BTreeMap::new();
+        log::debug!("DWARF walker starting: {} units to process", self.units.len());
         for unit in self.units {
             let mut subprograms = self.parse_tree(unit)?;
+            log::debug!("Parsed {} subprograms from unit", subprograms.len());
+            let mut retained = 0;
+            let mut filtered_out = 0;
             subprograms.retain(|subprogram| {
                 subprogram_offset_to_namespace.insert(subprogram.offset, subprogram.namespace.clone());
 
@@ -1063,13 +1068,34 @@ where
                     }
                 }
 
-                !subprogram.sources.is_empty()
+                let has_sources = !subprogram.sources.is_empty();
+                // TEMPORARY FIX: If we have line entries but no source addresses, 
+                // it might be a DWARF address mapping issue. Keep subprograms with 
+                // declaration locations so we can at least provide function-level mapping.
+                let has_decl_location = subprogram.decl_location.is_some();
+                let should_retain = has_sources || (!subprogram.is_declaration && has_decl_location);
+                
+                if should_retain {
+                    retained += 1;
+                    if !has_sources {
+                        log::debug!("Retaining subprogram '{}' despite no source addresses (has decl_location)", 
+                            subprogram.function_name.as_deref().unwrap_or("unnamed"));
+                    }
+                } else {
+                    filtered_out += 1;
+                    log::debug!("Filtering out subprogram '{}' - no source addresses or decl_location", 
+                        subprogram.function_name.as_deref().unwrap_or("unnamed"));
+                }
+                should_retain
             });
+            log::debug!("Subprogram filtering: retained {}, filtered out {}", retained, filtered_out);
             subprograms_for_unit.push(subprograms);
 
             let lines = if let Some(debug_line) = self.sections.debug_line {
+                log::debug!("Processing debug_line section for unit");
                 extract_lines(debug_line.index(), self.relocations, self.section_map, unit, self.is_64bit)?
             } else {
+                log::debug!("No debug_line section found for unit");
                 Default::default()
             };
 
@@ -1146,8 +1172,28 @@ where
             }
         }
 
+        // Create direct line map for fallback when subprogram mapping fails
+        let mut line_map: HashMap<SectionTarget, SourceCodeLocation> = HashMap::new();
+        for all_lines in &lines_for_unit {
+            for line_entry in all_lines {
+                line_map.insert(line_entry.target, line_entry.location.clone());
+            }
+        }
+        log::debug!("Created direct line map with {} entries", line_map.len());
+
+        // Create a function name to namespace mapping before consuming subprograms_for_unit
+        let mut function_to_namespace: HashMap<String, Option<Arc<str>>> = HashMap::new();
+        for subprograms in &subprograms_for_unit {
+            for subprogram in subprograms {
+                if let Some(function_name) = &subprogram.function_name {
+                    function_to_namespace.insert(function_name.to_string(), subprogram.namespace.clone());
+                }
+            }
+        }
+
         let mut location_map: HashMap<SectionTarget, Arc<[Location]>> = HashMap::new();
         for (subprograms, all_lines) in subprograms_for_unit.into_iter().zip(lines_for_unit.into_iter()) {
+            log::debug!("Processing unit with {} subprograms and {} line entries", subprograms.len(), all_lines.len());
             let mut lines_for_section: HashMap<SectionIndex, Vec<&LineEntry>> = HashMap::new();
             for entry in &all_lines {
                 lines_for_section
@@ -1155,6 +1201,7 @@ where
                     .or_insert_with(Vec::new)
                     .push(entry);
             }
+            log::debug!("Line entries grouped into {} sections", lines_for_section.len());
 
             let line_range_map_for_section: HashMap<SectionIndex, RangeMap<&LineEntry>> = lines_for_section
                 .into_iter()
@@ -1167,6 +1214,12 @@ where
                 .collect();
 
             for subprogram in subprograms {
+                // Skip subprograms without source addresses (e.g., those retained only for declaration locations)
+                if subprogram.sources.is_empty() {
+                    log::debug!("Skipping subprogram '{}' during mapping phase - no source addresses", 
+                        subprogram.function_name.as_deref().unwrap_or("unnamed"));
+                    continue;
+                }
                 let source = subprogram.sources[0];
                 log::trace!("  Frame: {}", source);
 
@@ -1390,7 +1443,28 @@ where
             }
         }
 
-        Ok(location_map)
+        // If location_map is empty (all subprograms skipped due to address mapping issues),
+        // create location entries directly from line information
+        if location_map.is_empty() && !line_map.is_empty() {
+            log::debug!("Location map is empty but line map has {} entries. Creating fallback location map from line information.", line_map.len());
+            
+            // Create location entries from line information
+            for (target, source_location) in &line_map {
+                let location = Location {
+                    kind: FrameKind::Line,
+                    namespace: None, // We don't have perfect namespace correlation without addresses
+                    function_name: None, // We don't have perfect function correlation without addresses  
+                    source_code_location: Some(source_location.clone()),
+                };
+                
+                let location_stack: Arc<[Location]> = vec![location].into();
+                location_map.insert(*target, location_stack);
+            }
+            
+            log::debug!("Created fallback location map with {} entries from line information", location_map.len());
+        }
+
+        Ok((location_map, line_map))
     }
 
     fn parse_tree(&mut self, unit: &Unit<ReaderWrapper<R>>) -> Result<Vec<SubProgram<R>>, ProgramFromElfError> {
@@ -1870,6 +1944,8 @@ pub(crate) struct DwarfInfo {
     // This is not the most efficient representation, but it's invariant
     // to any transformations that might be applied to the code.
     pub location_map: HashMap<SectionTarget, Arc<[Location]>>,
+    // Direct line mapping for when subprogram address mapping fails
+    pub line_map: HashMap<SectionTarget, SourceCodeLocation>,
 }
 
 struct AttributeValue<R>
@@ -2397,6 +2473,7 @@ pub(crate) fn load_dwarf(
         is_64bit,
     };
 
-    let location_map = walker.run()?;
-    Ok(DwarfInfo { location_map })
+    let (location_map, line_map) = walker.run()?;
+    log::debug!("DWARF walker.run() completed: found {} location entries, {} line entries", location_map.len(), line_map.len());
+    Ok(DwarfInfo { location_map, line_map })
 }

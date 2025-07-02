@@ -11,6 +11,7 @@ use core::ops::Range;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::Arc;
+use serde::{Deserialize, Serialize};
 
 use crate::dwarf::Location;
 use crate::elf::{Elf, Section, SectionIndex};
@@ -195,12 +196,6 @@ impl From<ProgramFromElfErrorKind> for ProgramFromElfError {
 impl ProgramFromElfError {
     pub(crate) fn other(error: impl Into<Cow<'static, str>>) -> Self {
         Self(ProgramFromElfErrorKind::Other(error.into()))
-    }
-}
-
-impl From<ProgramFromElfError> for String {
-    fn from(error: ProgramFromElfError) -> String {
-        error.to_string()
     }
 }
 
@@ -2457,9 +2452,8 @@ fn convert_instruction(
                         src1: RegImm::Reg(Reg::E3),
                         src2: RegImm::Imm(32),
                     }));
-
-                    operand = Some(Reg::E3);
                 }
+                operand = Some(Reg::E3);
             }
             let operand_regimm = operand.map_or(RegImm::Imm(0), RegImm::Reg);
             let (old_value, new_value, output) = match cast_reg_non_zero(old_value)? {
@@ -8892,6 +8886,7 @@ pub struct Config {
     elide_unnecessary_loads: bool,
     dispatch_table: Vec<Vec<u8>>,
     min_stack_size: u32,
+    debug_json_output_path: Option<std::path::PathBuf>,
 }
 
 impl Default for Config {
@@ -8903,6 +8898,7 @@ impl Default for Config {
             elide_unnecessary_loads: true,
             dispatch_table: Vec::new(),
             min_stack_size: VM_MIN_PAGE_SIZE * 2,
+            debug_json_output_path: None,
         }
     }
 }
@@ -8942,6 +8938,11 @@ impl Config {
         self.min_stack_size = value;
         self
     }
+
+    pub fn set_debug_json_output_path<P: AsRef<std::path::Path>>(&mut self, path: Option<P>) -> &mut Self {
+        self.debug_json_output_path = path.map(|p| p.as_ref().to_path_buf());
+        self
+    }
 }
 
 pub fn program_from_elf(config: Config, data: &[u8]) -> Result<Vec<u8>, ProgramFromElfError> {
@@ -8956,6 +8957,8 @@ pub fn program_from_elf(config: Config, data: &[u8]) -> Result<Vec<u8>, ProgramF
 }
 
 fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, ProgramFromElfError> {
+    println!("Parsing ELF file...");
+    println!("Parsing ELF file {}", config.debug_json_output_path.as_ref().map(|p| format!("(output to {})", p.display())).unwrap_or_default());
     let is_rv64 = elf.is_64();
     let bitness = if is_rv64 { Bitness::B64 } else { Bitness::B32 };
 
@@ -9057,31 +9060,6 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
                     | object::elf::SHT_STRTAB
                     | object::elf::SHT_RELA
             ) {
-                log::trace!(" {}: '{name}': skipping", section.index());
-                continue;
-            }
-
-            if section.is_progbits() && !section.is_writable() && !section.is_executable() {
-                sections_ro_data.push(section.index());
-                log::trace!(" {}: '{name}': autodetected as RO data", section.index());
-                continue;
-            }
-
-            if section.is_progbits() && section.is_writable() && !section.is_executable() {
-                sections_rw_data.push(section.index());
-                log::trace!(" {}: '{name}': autodetected as RW data", section.index());
-                continue;
-            }
-
-            if section.is_nobits() && section.is_writable() && !section.is_executable() {
-                sections_bss.push(section.index());
-                log::trace!(" {}: '{name}': autodetected as BSS", section.index());
-                continue;
-            }
-
-            if section.is_progbits() && !section.is_writable() && section.is_executable() {
-                sections_code.push(section.index());
-                log::trace!(" {}: '{name}': autodetected as code", section.index());
                 continue;
             }
 
@@ -9562,7 +9540,43 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
                     write_generic(size, data, relocation_target.offset, jump_target.into())?;
                 } else {
                     let Some(section_base) = base_address_for_section.get(&target.section_index) else {
+                        // Check if this relocation target section is unreachable (could be debug info or stripped)
                         if !reachability_graph.is_data_section_reachable(relocation_target.section_index) {
+                            let data = elf.section_data_mut(relocation_target.section_index);
+                            write_generic(size, data, relocation_target.offset, 0)?;
+                            continue;
+                        }
+
+                        // Check if this is a relocation to an import metadata symbol that should be handled differently
+                        let target_section_name = elf.section_by_index(target.section_index).name();
+
+                        // Check if this section contains import metadata symbols (like pallet_revive_uapi::host::*::METADATA)
+                        let is_import_metadata_section = target_section_name.starts_with(".rodata") &&
+                           !reachability_graph.is_data_section_reachable(target.section_index);
+
+                        // Additional check: look for common import metadata patterns in symbol names
+                        let mut is_likely_import_metadata = is_import_metadata_section;
+                        if !is_likely_import_metadata {
+                            // Check if any symbols in this section look like import metadata
+                            for symbol in elf.symbols() {
+                                if let Ok(symbol_target) = symbol.section_target() {
+                                    if symbol_target.section_index == target.section_index {
+                                        let symbol_name = symbol.name().unwrap_or("");
+                                        if symbol_name.contains("::METADATA") ||
+                                           symbol_name.contains("::host::") ||
+                                           symbol_name.contains("pallet_revive_uapi") {
+                                            is_likely_import_metadata = true;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if is_likely_import_metadata {
+                            // This appears to be a relocation to import metadata that's been stripped/not reachable
+                            // Write zero as a placeholder - import symbols will be resolved at runtime
+                            log::debug!("Zeroing relocation to unreachable import metadata in section '{}' (likely host function import)", target_section_name);
                             let data = elf.section_data_mut(relocation_target.section_index);
                             write_generic(size, data, relocation_target.offset, 0)?;
                             continue;
@@ -9571,7 +9585,7 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
                         return Err(ProgramFromElfError::other(format!(
                             "absolute relocation in section '{location_name}' targets section '{target_name}'[0x{target_offset:x}] which has no relocated base address assigned",
                             location_name = elf.section_by_index(relocation_target.section_index).name(),
-                            target_name = elf.section_by_index(target.section_index).name(),
+                            target_name = target_section_name,
                             target_offset = target.offset,
                         )));
                     };
@@ -9630,16 +9644,21 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
     }
 
     let mut location_map: HashMap<SectionTarget, Arc<[Location]>> = HashMap::new();
+    let mut dwarf_line_map: Option<HashMap<SectionTarget, crate::dwarf::SourceCodeLocation>> = None;
     if !config.strip {
         let mut string_cache = crate::utils::StringCache::default();
         let dwarf_info = crate::dwarf::load_dwarf(&mut string_cache, &elf, &relocations, &section_map)?;
         location_map = dwarf_info.location_map;
+        dwarf_line_map = Some(dwarf_info.line_map);
+        log::debug!("DWARF loading completed: location_map has {} entries", location_map.len());
 
         // If there is no DWARF info present try to use the symbol table as a fallback.
+        let mut fallback_added = 0;
         for (source, name) in parse_function_symbols(&elf)? {
             if location_map.contains_key(&source.begin()) {
                 continue;
             }
+            fallback_added += 1;
 
             let (namespace, function_name) = split_function_name(&name);
             let namespace = if namespace.is_empty() {
@@ -9660,9 +9679,11 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
                 location_map.insert(target, Arc::clone(&location_stack));
             }
         }
+
+        println!("Symbol table fallback: added {} entries. Total location_map entries: {}", fallback_added, location_map.len());
     }
 
-    log::trace!("Instruction count: {}", code.len());
+    println!("Instruction count: {}", code.len());
 
     let mut builder = if elf.is_64() {
         ProgramBlobBuilder::new_64bit()
@@ -9732,6 +9753,7 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
     assert_eq!(export_count, exports.len());
 
     let mut locations_for_instruction: Vec<Option<Arc<[Location]>>> = Vec::with_capacity(code.len());
+    let mut sources_for_instruction: Vec<Vec<SectionTarget>> = Vec::with_capacity(code.len());
     let mut raw_code = Vec::with_capacity(code.len());
 
     for (nth_inst, (source_stack, inst)) in code.into_iter().enumerate() {
@@ -9744,12 +9766,14 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
 
             // TODO: Use a smallvec.
             let mut list = Vec::new();
+            let mut instruction_sources = Vec::new();
             for source in source_stack.as_slice() {
                 for offset in (source.offset_range.start..source.offset_range.end).step_by(2) {
                     let target = SectionTarget {
                         section_index: source.section_index,
                         offset,
                     };
+                    instruction_sources.push(target);
 
                     if let Some(locations) = location_map.get(&target) {
                         if let Some(last) = list.last() {
@@ -9784,6 +9808,9 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
 
                 locations_for_instruction.push(Some(new_list.into()));
             }
+            sources_for_instruction.push(instruction_sources);
+        } else {
+            sources_for_instruction.push(Vec::new());
         }
 
         log::trace!(
@@ -9814,6 +9841,12 @@ fn program_from_elf_internal(config: Config, mut elf: Elf) -> Result<Vec<u8>, Pr
         assert_eq!(offsets.len(), locations_for_instruction.len());
 
         emit_debug_info(&mut builder, &locations_for_instruction, &offsets);
+
+        // Generate JSON debug mapping for step debugger if requested
+        if config.debug_json_output_path.is_some() {
+            let json_path = config.debug_json_output_path.as_deref();
+            generate_debug_json_mapping(&locations_for_instruction, &sources_for_instruction, &offsets, json_path, dwarf_line_map.as_ref())?;
+        }
     }
 
     let raw_blob = builder.to_vec().map_err(ProgramFromElfError::other)?;
@@ -10246,4 +10279,156 @@ fn emit_debug_info(
     builder.add_custom_section(program::SECTION_OPT_DEBUG_STRINGS, dbg_strings.section);
     builder.add_custom_section(program::SECTION_OPT_DEBUG_LINE_PROGRAMS, section_line_programs);
     builder.add_custom_section(program::SECTION_OPT_DEBUG_LINE_PROGRAM_RANGES, section_line_program_ranges);
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DebugInstruction {
+    program_counter: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    file: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    line: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    column: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    function: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    namespace: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct DebugMapping {
+    instructions: Vec<DebugInstruction>,
+}
+
+fn generate_debug_json_mapping(
+    locations_for_instruction: &[Option<Arc<[Location]>>],
+    sources_for_instruction: &[Vec<SectionTarget>],
+    offsets: &[(ProgramCounter, ProgramCounter)],
+    output_path: Option<&std::path::Path>,
+    line_map: Option<&HashMap<SectionTarget, crate::dwarf::SourceCodeLocation>>,
+) -> Result<(), ProgramFromElfError> {
+    let mut instructions = Vec::new();
+
+    for (nth_instruction, locations) in locations_for_instruction.iter().enumerate() {
+        let (program_counter, _) = offsets[nth_instruction];
+
+        // Default instruction entry with just program counter
+        let mut debug_instruction = DebugInstruction {
+            program_counter: program_counter.0,
+            file: None,
+            line: None,
+            column: None,
+            function: None,
+            namespace: None,
+        };
+
+        // If we have location information, extract the outermost (main function) location
+        if let Some(locations) = locations {
+            if let Some(location) = locations.first() {
+                // Debug: log what we have in the location
+                log::debug!("Instruction {}: Location has {} locations, first location: function={:?}, source_location={:?}",
+                    nth_instruction, locations.len(), location.function_name, location.source_code_location);
+
+                // Extract source code location
+                if let Some(source_location) = &location.source_code_location {
+                    debug_instruction.file = Some(source_location.path().to_string());
+                    debug_instruction.line = source_location.line();
+                    debug_instruction.column = source_location.column();
+                } else {
+                    log::debug!("Instruction {}: No source_code_location in Location object", nth_instruction);
+                }
+
+                // Extract function and namespace information
+                debug_instruction.function = location.function_name.as_ref().map(|s| s.to_string());
+                debug_instruction.namespace = location.namespace.as_ref().map(|s| s.to_string());
+            }
+        } else {
+            log::debug!("Instruction {}: No location information", nth_instruction);
+
+            // Fallback: try to use direct DWARF line mapping
+            if let Some(line_map) = line_map {
+                // Get the sources for this instruction
+                let instruction_sources = &sources_for_instruction[nth_instruction];
+                log::debug!("Instruction {}: Attempting line map fallback - checking {} sources against {} line entries",
+                    nth_instruction, instruction_sources.len(), line_map.len());
+
+                // Try to find line information for any of the sources
+                for &source_target in instruction_sources {
+                    log::debug!("Instruction {}: Checking source target: section={:?}, offset={:x}",
+                        nth_instruction, source_target.section_index, source_target.offset);
+
+                    // First try exact match
+                    if let Some(source_location) = line_map.get(&source_target) {
+                        debug_instruction.file = Some(source_location.path().to_string());
+                        debug_instruction.line = source_location.line();
+                        debug_instruction.column = source_location.column();
+                        log::debug!("Instruction {}: Found exact line info from fallback: {}:{:?}:{:?}",
+                            nth_instruction, source_location.path(), source_location.line(), source_location.column());
+                        break;
+                    }
+
+                    // If no exact match, try to find the nearest line entry in the same section
+                    let mut best_match: Option<(u64, &crate::dwarf::SourceCodeLocation)> = None;
+                    for (target, location) in line_map.iter() {
+                        if target.section_index == source_target.section_index {
+                            let distance = if target.offset <= source_target.offset {
+                                source_target.offset - target.offset
+                            } else {
+                                target.offset - source_target.offset
+                            };
+
+                            if let Some((best_distance, _)) = best_match {
+                                if distance < best_distance {
+                                    best_match = Some((distance, location));
+                                }
+                            } else {
+                                best_match = Some((distance, location));
+                            }
+                        }
+                    }
+
+                    if let Some((distance, source_location)) = best_match {
+                        debug_instruction.file = Some(source_location.path().to_string());
+                        debug_instruction.line = source_location.line();
+                        debug_instruction.column = source_location.column();
+                        log::debug!("Instruction {}: Found nearest line info from fallback (distance={}): {}:{:?}:{:?}",
+                            nth_instruction, distance, source_location.path(), source_location.line(), source_location.column());
+                        break;
+                    }
+                }
+
+                // Debug: show a few line map entries for comparison
+                if nth_instruction == 100 {
+                    log::debug!("Sample line map entries:");
+                    for (target, location) in line_map.iter().take(5) {
+                        log::debug!("  Line map: section={:?}, offset={:x} -> {}:{:?}",
+                            target.section_index, target.offset, location.path(), location.line());
+                    }
+                }
+            }
+        }
+
+        instructions.push(debug_instruction);
+    }
+
+    let debug_mapping = DebugMapping { instructions };
+
+    let json_output = serde_json::to_string_pretty(&debug_mapping)
+        .map_err(|e| ProgramFromElfError::other(format!("Failed to serialize debug mapping to JSON: {}", e)))?;
+
+    if let Some(output_path) = output_path {
+        // Write to specified file
+        std::fs::write(output_path, json_output)
+            .map_err(|e| ProgramFromElfError::other(format!("Failed to write debug mapping JSON to file: {}", e)))?;
+        println!("Debug mapping JSON written to: {}", output_path.display());
+    } else {
+        // Write to default location based on current working directory
+        let default_path = std::path::Path::new("debug_mapping.json");
+        std::fs::write(default_path, json_output)
+            .map_err(|e| ProgramFromElfError::other(format!("Failed to write debug mapping JSON to file: {}", e)))?;
+        println!("Debug mapping JSON written to: {}", default_path.display());
+    }
+
+    Ok(())
 }

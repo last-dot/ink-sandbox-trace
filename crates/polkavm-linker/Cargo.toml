@@ -18,6 +18,8 @@ rustc-demangle = { workspace = true }
 hashbrown = { workspace = true, features = ["raw"] }
 regalloc2 = { workspace = true }
 dirs = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 diff = { workspace = true }
