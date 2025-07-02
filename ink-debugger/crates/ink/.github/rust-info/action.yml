@@ -1,0 +1,16 @@
+name: Rust Info
+description: Rust and Bash details
+runs:
+  using: composite
+  steps:
+    - run: |
+        rustup show
+        cargo --version
+        rustup +nightly show
+        cargo +nightly --version
+        bash --version
+        ink-node --version
+        cargo contract --version
+        git --version
+        echo -e '[registry]\nprotocol = "sparse"' > /usr/local/cargo/config.toml
+      shell: bash

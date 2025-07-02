@@ -2,7 +2,6 @@ pub(crate) mod rpc {
     use crate::api::DapCommand;
     use crate::constants::headers::CONTENT_LENGTH;
     use crate::constants::messages::{EOF, HEADER_PARSING_ERROR, JSON_RPC_VERSION};
-    use crate::sandbox::SandboxError;
     use serde::{Deserialize, Serialize};
     use serde_json::{json, Value};
     use std::fmt::{Display, Formatter};
@@ -122,12 +121,35 @@ pub(crate) mod rpc {
 pub(crate) mod params {
     use crate::constants::messages::PARAMS_NOT_FOUND;
     use crate::domain::rpc::JsonRpcRequest;
-    use crate::sandbox::SandboxError;
     use serde::Deserialize;
 
     #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
     pub(crate) struct InitParams {
         pub polkavm: String,
+    }
+
+    #[derive(Deserialize, Debug, Clone, PartialEq, Eq)]
+    pub(crate) struct ContinueParams {
+        pub until: String,
+    }
+
+    impl TryFrom<&JsonRpcRequest> for ContinueParams {
+        type Error = SandboxError;
+
+        fn try_from(value: &JsonRpcRequest) -> Result<Self, Self::Error> {
+            let params = value
+                .params
+                .as_ref()
+                .ok_or_else(|| Self::Error::from(PARAMS_NOT_FOUND.to_string()))?;
+
+            let until = params
+                .get("until")
+                .and_then(|v| v.as_str())
+                .ok_or_else(|| Self::Error::from(PARAMS_NOT_FOUND.to_string()))?
+                .to_string();
+
+            Ok(ContinueParams { until })
+        }
     }
 
     impl TryFrom<&JsonRpcRequest> for InitParams {

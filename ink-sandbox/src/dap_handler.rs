@@ -1,4 +1,4 @@
-use crate::constants::messages::POLKAVM_FILE_NOT_FOUND;
+use crate::domain::params::ContinueParams;
 use crate::domain::rpc::JsonRpcResponse;
 use crate::sandbox::{Sandbox, SandboxError};
 use serde_json::json;
@@ -14,72 +14,85 @@ impl CliHandler {
 }
 
 pub(crate) trait DapHandler<T> {
-    fn handle_initialize(&mut self, path: Option<String>) -> Result<T, SandboxError>;
+    fn handle_initialize(&mut self, path: String) -> Result<T, SandboxError>;
     fn handle_disconnect(&mut self) -> Result<T, SandboxError>;
     fn handle_pause(&mut self) -> Result<T, SandboxError>;
-    fn handle_continue(&mut self) -> Result<T, SandboxError>;
+    fn handle_continue(&mut self, params: ContinueParams) -> Result<T, SandboxError>;
     fn handle_next(&mut self) -> Result<T, SandboxError>;
     fn handle_unknown(&mut self, command: String) -> Result<T, SandboxError>;
 }
 
 impl DapHandler<JsonRpcResponse> for CliHandler {
-    fn handle_initialize(
-        &mut self,
-        polkavm_path: Option<String>,
-    ) -> Result<JsonRpcResponse, SandboxError> {
-        let response = if let Some(path) = polkavm_path {
-            self.sandbox = Some(Sandbox::from_uri(path.as_str())?);
-            JsonRpcResponse::result(json!({
+    fn handle_initialize(&mut self, polkavm_path: String) -> Result<JsonRpcResponse, SandboxError> {
+        self.sandbox = Some(Sandbox::from_uri(polkavm_path.as_str())?);
+        Ok(JsonRpcResponse::result(
+            json!({
                 "status": "initialized",
                 "version": env!("CARGO_PKG_VERSION")
-            }), None)
-        } else {
-            JsonRpcResponse::error(POLKAVM_FILE_NOT_FOUND, None)
-        };
-
-        Ok(response)
+            }),
+            None,
+        ))
     }
 
     fn handle_disconnect(&mut self) -> Result<JsonRpcResponse, SandboxError> {
-        Ok(JsonRpcResponse::default())
+        Ok(JsonRpcResponse::result(
+            json!({ "disconnected": true }),
+            None,
+        ))
     }
 
     fn handle_pause(&mut self) -> Result<JsonRpcResponse, SandboxError> {
-        if let Some(sandbox) = &self.sandbox {
-            sandbox.selectors();
-        }
-
         Ok(JsonRpcResponse::default())
     }
 
-    fn handle_continue(&mut self) -> Result<JsonRpcResponse, SandboxError> {
-        Ok(JsonRpcResponse::default())
+    // 3. Continue
+    // // Запрос:
+    // Content-Length: 67\r\n\r\n{"jsonrpc": "2.0", "method": "continue", "params": {"until": "123123"}, "id": 3}
+    //
+    // // Ответ:
+    // Content-Length: 56\r\n
+    // \r\n
+    // {"jsonrpc": "2.0", "result": {"status": "running"}, "id": 3}
+    //
+    // // Позже придет событие (без id - это notification):
+    // Content-Length: 145\r\n
+    // \r\n
+    // {"jsonrpc": "2.0", "method": "stopped", "params": {"reason": "breakpoint", "address": 0x1000, "breakpointId": 1}}
+    fn handle_continue(&mut self, params: ContinueParams) -> Result<JsonRpcResponse, SandboxError> {
+        self.sandbox.as_mut().unwrap().execute_until(params.until.as_str());
+        Ok(JsonRpcResponse::result(
+            json!({ "status": "running", "instructionPointer": params.until }),
+            None,
+        ))
     }
 
     fn handle_next(&mut self) -> Result<JsonRpcResponse, SandboxError> {
         Ok(JsonRpcResponse::default())
     }
 
+    // {"jsonrpc": "2.0", "method": "ksdjifghlsakrjghawlrieuw", "params": {}}
     fn handle_unknown(&mut self, command: String) -> Result<JsonRpcResponse, SandboxError> {
-        Ok(JsonRpcResponse::error(
-            format!("Unknown command: {}", command).as_str(),
-            None,
-        ))
+        let message = format!("Unknown method: {}", command);
+        if let Some(resp) = json!({"code": "404","message": message}).as_str() {
+            Ok(JsonRpcResponse::error(resp, None))
+        } else {
+            Ok(JsonRpcResponse::error("Unknown method", None))
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::sandbox::Sandbox;
 
     #[test]
-    fn test_handle_pause_with_sandbox() {
+    fn test_handle_continue() {
         let mut handler = CliHandler::new();
-        handler.sandbox = Some(Sandbox::from_uri("/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm").unwrap());
+        let result = handler.handle_initialize("/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm".to_string());
+        assert!(result.is_ok());
 
-        let response = handler.handle_pause();
-
-        assert!(response.is_ok(), "Expected Ok response");
+        handler.handle_continue(ContinueParams {
+            until: "instruction123".to_string(),
+        }).unwrap();
     }
 }

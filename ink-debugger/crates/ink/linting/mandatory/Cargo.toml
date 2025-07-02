@@ -1,0 +1,60 @@
+[package]
+name = "ink_linting_mandatory"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+license.workspace = true
+readme = "README.md"
+repository.workspace = true
+documentation = "https://docs.rs/ink_linting_mandatory"
+homepage.workspace = true
+description = "Mandatory ink! linting rules"
+keywords.workspace = true
+include = ["Cargo.toml", "*.rs", "LICENSE"]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+dylint_linting = "4.0.1"
+if_chain = "1.0.2"
+log = "0.4.14"
+regex = "1.5.4"
+ink_linting_utils = { workspace = true }
+
+[dev-dependencies]
+dylint_testing = "4.0.1"
+
+# The ink! dependencies used to build the `ui` tests and to compile the linting
+# library with `--default-features=std` (see the `features` section bellow).
+#
+# These cannot be moved to the workspace level because `cargo` does not provide
+# the `[[workspace.dev-dependencies]]` directive.
+ink = { version = "=6.0.0-alpha", path = "../../crates/ink" }
+
+# For the moment we have to include the tests as examples and
+# then use `dylint_testing::ui_test_examples`.
+#
+# The reason is that the `dylint_testing` API currently does not
+# provide any other option to run the tests on those files
+# *while giving us the option to specify the dependencies*.
+#
+# Those files require the ink! dependencies though, by having
+# them as examples here, they inherit the `dev-dependencies`.
+[[example]]
+name = "no_main_pass"
+path = "ui/pass/no_main.rs"
+
+[package.metadata.rust-analyzer]
+rustc_private = true
+
+[features]
+default = ["std"]
+std = [
+    "ink/std",
+]
+ink-as-dependency = []
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(dylint_lib, values("ink_linting"))'] }

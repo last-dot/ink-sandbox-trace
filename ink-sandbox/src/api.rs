@@ -1,8 +1,7 @@
 use crate::api::DapCommand::*;
 use crate::dap_handler::DapHandler;
-use crate::domain::params::InitParams;
+use crate::domain::params::{ContinueParams, InitParams};
 use crate::domain::rpc::{JsonRpcRequest, JsonRpcResponse};
-use crate::sandbox::SandboxError;
 
 pub type RpcRequest = Result<JsonRpcRequest, SandboxError>;
 
@@ -10,12 +9,12 @@ pub type RpcRequest = Result<JsonRpcRequest, SandboxError>;
 pub enum DapCommand {
     //{"jsonrpc": "2.0", "method": "initialize", "params": {"polkavm": "/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm"}, "id": "1"}
     //Content-Length: 123\r\n\r\n{"jsonrpc": "2.0", "method": "initialize", "params": {"path": "/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target/ink/flipper.polkavm"}, "id": 1}
-    Initialize(Option<InitParams>), // Инициализация отладчика
+    Initialize(InitParams), // Инициализация отладчика
     // {"jsonrpc": "2.0", "method": "pause", "id": "2"}
     Pause, // Приостановить выполнение
     // {"jsonrpc": "2.0", "method": "continue", "id": "3"}
-    Continue, // Продолжить выполнение
-    // {"jsonrpc": "2.0", "method": "disconnect", "id": "4"}
+    Continue(ContinueParams), // Продолжить выполнение
+    // Content-Length: 69\r\n\r\n{"jsonrpc": "2.0", "method": "disconnect", "params": {}, "id": 9}
     Disconnect, // Отключение отладчика
     // {"jsonrpc": "2.0", "method": "next", "id": "5"}
     Next, // Шаг через (Step Over)
@@ -43,9 +42,9 @@ pub fn dispatch_request<H: DapHandler<JsonRpcResponse>>(
             }
             let req = req.unwrap();
             let response = match req {
-                Initialize(path) => handler.handle_initialize(path.map(|x| x.polkavm)),
+                Initialize(path) => handler.handle_initialize(path.polkavm),
                 Disconnect => handler.handle_disconnect(),
-                Continue => handler.handle_continue(),
+                Continue(params) => handler.handle_continue(params),
                 Next => handler.handle_next(),
                 Pause => handler.handle_pause(),
                 Unknown(name) => handler.handle_unknown(name),
@@ -72,10 +71,13 @@ impl TryFrom<&JsonRpcRequest> for DapCommand {
         match req.method.as_str() {
             "initialize" => {
                 let init_params = InitParams::try_from(req)?;
-                Ok(Initialize(Some(init_params)))
+                Ok(Initialize(init_params))
             }
             "pause" => Ok(Pause),
-            "continue" => Ok(Continue),
+            "continue" => {
+                let params = ContinueParams::try_from(req)?;
+                Ok(Continue(params))
+            },
             "disconnect" => Ok(Disconnect),
             "next" => Ok(Next),
             other => Ok(Unknown(other.to_string())),
