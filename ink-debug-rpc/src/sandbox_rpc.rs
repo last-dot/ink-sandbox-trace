@@ -1,3 +1,4 @@
+use polkavm::RawInstance;
 use serde_json::{Value, to_value};
 use std::{
     io::{Error, ErrorKind},
@@ -8,10 +9,13 @@ use tokio::{
     net::{TcpListener, TcpSocket},
 };
 
-use crate::{domain::{JsonRpcError, JsonRpcRequest}, methods};
+use crate::{
+    domain::{JsonRpcError, JsonRpcRequest},
+    methods,
+};
 
 #[derive(Debug, Clone)]
-pub(crate) struct SandboxRpc {
+pub struct SandboxRpc {
     host: String,
     port: String,
     max_connections: u8,
@@ -84,16 +88,27 @@ impl SandboxRpc {
         }
     }
 
-    pub async fn serve_async(&self) -> Result<(), std::io::Error> {
+    pub fn serve_async(&self) -> Result<(), std::io::Error> {
         let this = self.clone();
+        let rt = tokio::runtime::Runtime::new().unwrap();
+
         log::info!("[Rpc Sandbox starting]");
-        tokio::spawn(async move {
+        rt.spawn(async move {
             if let Err(e) = this.serve().await {
                 log::error!("Serve failed: {e}");
             }
         });
 
         Ok(())
+    }
+
+    pub fn step(&self, instance: &RawInstance) {
+        log::debug!("[Sandbox Rpc] Step");
+        let pc = instance
+            .program_counter()
+            .expect("[Sandbox Rpc] PC not found");
+        log::info!("[Sandbox Rpc] [PC: {}]", pc);
+        println!("[Sandbox Rpc] [PC: {}]", pc);
     }
 }
 
