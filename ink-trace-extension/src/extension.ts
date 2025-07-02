@@ -1,37 +1,47 @@
 import * as vscode from 'vscode';
-import { InkDebugSession } from './inkDebugSession';
+import { PythonDapLauncher } from './PythonDapLauncher';
+
+const outputChannel = vscode.window.createOutputChannel('Ink Trace Debugger');
 
 export function activate(context: vscode.ExtensionContext) {
+    outputChannel.appendLine('Ink Trace Debugger: Activated');
+
+    const factory = new InkDebugAdapterDescriptorFactory(context, outputChannel);
+
     context.subscriptions.push(
-        vscode.debug.registerDebugAdapterDescriptorFactory(
-            'ink-trace',
-            new InkDebugAdapterDescriptorFactory()
-        ),
-        vscode.debug.registerDebugConfigurationProvider(
-            'ink-trace',
-            new InkDebugConfigurationProvider()
-        )
+        vscode.debug.registerDebugAdapterDescriptorFactory('ink-trace', factory),
+
+        vscode.debug.registerDebugConfigurationProvider('ink-trace', {
+            provideDebugConfigurations(): vscode.ProviderResult<vscode.DebugConfiguration[]> {
+                return [
+                    {
+                        type: 'ink-trace',
+                        request: 'launch',
+                        name: 'Debug Ink Contract',
+                        program: '${file}',
+                        stopOnEntry: true
+                    }
+                ];
+            }
+        }),
+        outputChannel
     );
 }
 
-export function deactivate() {}
-
-class InkDebugConfigurationProvider implements vscode.DebugConfigurationProvider {
-    resolveDebugConfiguration(
-        _folder: vscode.WorkspaceFolder | undefined, 
-        config: vscode.DebugConfiguration
-    ): vscode.ProviderResult<vscode.DebugConfiguration> {
-        
-        if (!config.program) {
-            config.program = '${file}';
-        }
-        
-        return config;
-    }
+export function deactivate() {
+    outputChannel.appendLine('Ink Trace Debugger: Deactivated');
 }
 
 class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
-    createDebugAdapterDescriptor(session: vscode.DebugSession): vscode.ProviderResult<vscode.DebugAdapterDescriptor> {
-        return new vscode.DebugAdapterInlineImplementation(new InkDebugSession());
+    private readonly launcher: PythonDapLauncher;
+
+    constructor(context: vscode.ExtensionContext, channel: vscode.OutputChannel) {
+        this.launcher = new PythonDapLauncher(context, channel);
+    }
+
+    async createDebugAdapterDescriptor(
+        session: vscode.DebugSession
+    ): Promise<vscode.DebugAdapterDescriptor> {
+        return this.launcher.getDAPExecutable(session.configuration);
     }
 }
