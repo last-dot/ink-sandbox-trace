@@ -24,7 +24,9 @@ pub struct SandboxRpc {
 
 impl Default for SandboxRpc {
     fn default() -> Self {
-        simple_logger::init_with_level(log::Level::Debug).expect("Logger initialization faled");
+        if let Err(e) = simple_logger::init_with_level(log::Level::Debug) {
+            log::warn!("Logger error: {e}");
+        };
         SandboxRpc {
             host: String::from("127.0.0.1"),
             port: String::from("9229"),
