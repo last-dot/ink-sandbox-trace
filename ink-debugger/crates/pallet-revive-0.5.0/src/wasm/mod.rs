@@ -297,14 +297,14 @@ where
 	BalanceOf<E::T>: TryFrom<U256>,
 {
 	pub fn call(mut self) -> ExecResult {
-		let sandox = SandboxRpc::default();
-		if let  Err(e) = sandox.serve_async() {
+		let sandbox = SandboxRpc::default();
+		if let  Err(e) = sandbox.serve_async() {
 			log::error!("failed to start sandbox rpc server: {:?}", e);
 			panic!("failed to start sandbox rpc server");
 		}
 		let exec_result = loop {
 			let interrupt = self.instance.run();
-			sandox.step(&self.instance);
+			sandbox.step(&self.instance);
 			let program_counter = &mut self.instance.program_counter();
 			if let Some(exec_result) =
 				self.runtime.handle_interrupt(interrupt, &self.module, &mut self.instance, program_counter)
