@@ -1,0 +1,23 @@
+[package]
+name = "bench-minimal"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "bench_minimal"
+path = "src/main.rs"
+crate-type = ["cdylib"]
+
+[[bin]]
+name = "bench-minimal"
+path = "src/main.rs"
+
+[dependencies]
+simplealloc = { path = "../../crates/simplealloc" }
+
+[target.'cfg(target_env = "polkavm")'.dependencies]
+polkavm-derive = { path = "../../crates/polkavm-derive" }
+
+[lints]
+workspace = true

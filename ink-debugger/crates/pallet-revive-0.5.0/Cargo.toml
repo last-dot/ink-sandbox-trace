@@ -98,6 +98,11 @@ try-runtime = [
 name = "pallet_revive"
 path = "src/lib.rs"
 
+[dependencies.ink-debug-rpc]
+path = "../../../ink-debug-rpc"
+default-features = false
+
+
 [dependencies.alloy-core]
 version = "0.8.15"
 features = ["sol-types"]
@@ -198,11 +203,11 @@ version = "1.0.15"
 default-features = false
 
 [dependencies.polkavm]
-version = "0.21.0"
+path = "../polkavm-0.21.0/crates/polkavm"
 features = ["generic-sandbox"]
 
 [dependencies.polkavm-common]
-version = "0.21.0"
+path = "../polkavm-0.21.0/crates/polkavm-common"
 optional = true
 default-features = false
 

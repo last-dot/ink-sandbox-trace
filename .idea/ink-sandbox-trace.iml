@@ -64,6 +64,22 @@
       <sourceFolder url="file://$MODULE_DIR$/ink-debugger/drink-cli/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ink-debugger/drink/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ink-debugger/drink/test-macro/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-assembler/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-common/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-derive-impl-macro/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-derive-impl/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-derive/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-disassembler/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-linker/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm-linux-raw/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/polkavm/tests" isTestSource="true" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/crates/simplealloc/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/examples/doom/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/examples/hello-world/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/tools/polkatool/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/tools/polkavm-linux-raw-generate/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/tools/spectool/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/ink-debugger/examples" isTestSource="false" />
       <excludeFolder url="file://$MODULE_DIR$/.venv" />
       <excludeFolder url="file://$MODULE_DIR$/ink-sandbox/target" />
@@ -80,6 +96,7 @@
       <excludeFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm/target" />
       <excludeFolder url="file://$MODULE_DIR$/ink-debugger/examples/flipper/target" />
       <excludeFolder url="file://$MODULE_DIR$/ink-debugger/target" />
+      <excludeFolder url="file://$MODULE_DIR$/ink-debugger/crates/polkavm-0.21.0/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

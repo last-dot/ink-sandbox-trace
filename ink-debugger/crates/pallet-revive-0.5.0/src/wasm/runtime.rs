@@ -654,10 +654,7 @@ impl<'a, E: Ext, M: PolkaVmInstance<E::T>> Runtime<'a, E, M> {
             Ok(Trap) => Some(Err(Error::<E::T>::ContractTrapped.into())),
             Ok(Segfault(_)) => Some(Err(Error::<E::T>::ExecutionFailed.into())),
             Ok(NotEnoughGas) => Some(Err(Error::<E::T>::OutOfGas.into())),
-            Ok(Step) => {
-                println!("step: {:?}", program_counter);
-                None
-            }
+            Ok(Step) => None,
             Ok(Ecalli(idx)) => {
                 // This is a special hard coded syscall index which is used by benchmarks
                 // to abort contract execution. It is used to terminate the execution without
