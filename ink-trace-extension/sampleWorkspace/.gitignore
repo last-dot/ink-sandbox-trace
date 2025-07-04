@@ -1,11 +1,20 @@
-# Ignore build artifacts from the local tests sub-crate.
+# Node.js / VS Code Extension Rules
+node_modules/
+out/
+*.log
+startup_debug.log
+debug.log
+package-lock.json
+
+# VS Code user settings
+.vscode/
+!/.vscode/extensions.json
+!/.vscode/launch.json
+!/.vscode/settings.json
+!/.vscode/tasks.json
+
+# Existing Rust Rules
 /target/
-
-# Ignore backup files creates by cargo fmt.
 **/*.rs.bk
-
-# Remove Cargo.lock when creating an executable, leave it for libraries
-# More information here http://doc.crates.io/guide.html#cargotoml-vs-cargolock
 Cargo.lock
 *.asm
-# ELF /Users/maliketh/ink/ink-trace/sampleWorkspace/target/ink/riscv64emac-unknown-none-polkavm/release/flipper
