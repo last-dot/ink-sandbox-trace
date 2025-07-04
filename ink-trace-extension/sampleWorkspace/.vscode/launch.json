@@ -4,9 +4,10 @@
     {
       "type": "ink-trace",
       "request": "launch",
-      "name": "Ink Trace Launch",
-      "program": "${file}",
-      "stopOnEntry": true
+      "name": "Ink Trace: Launch",
+      "program": "${file}", 
+      "stopOnEntry": true,
+      "args": []
     }
   ]
 }
