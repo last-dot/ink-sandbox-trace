@@ -1,8 +1,9 @@
 {
   "name": "ink-trace-extension",
-  "displayName": "ink-trace-extension",
-  "description": "Debugger for smart contracts for ink!",
+  "displayName": "Ink Trace Debugger",
+  "description": "Debugger for ink! smart contracts",
   "version": "0.0.1",
+  "publisher": "undefined_publisher",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -10,13 +11,16 @@
     "Debuggers"
   ],
   "activationEvents": [
-    "onDebug"
+    "onDebugResolve:ink-trace",
+    "onDebugInitialConfigurations",
+    "onCommand:ink-trace.debugTest",
+    "onLanguage:rust"
   ],
   "main": "./out/extension.js",
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
+    "watch": "tsc -w -p ./",
     "pretest": "npm run compile && npm run lint",
     "lint": "eslint src --ext ts",
     "test": "vscode-test"
@@ -26,22 +30,6 @@
       {
         "type": "ink-trace",
         "label": "Ink Trace Debug",
-        "languages": [
-          "rust"
-        ],
-        "configurationSnippets": [
-          {
-            "label": "Ink Trace: Launch",
-            "description": "Launch and debug a file with Ink Trace.",
-            "body": {
-              "type": "ink-trace",
-              "request": "launch",
-              "name": "Ink Trace Launch",
-              "program": "${file}",
-              "stopOnEntry": true
-            }
-          }
-        ],
         "configurationAttributes": {
           "launch": {
             "required": [
@@ -50,23 +38,62 @@
             "properties": {
               "program": {
                 "type": "string",
-                "description": "Absolute path to the program file to debug.",
-                "default": "${file}"
+                "description": "Path to your lib.rs or contract folder."
               },
               "stopOnEntry": {
                 "type": "boolean",
-                "description": "Automatically stop the debugger after launch.",
-                "default": true
+                "default": true,
+                "description": "Break at the beginning of the contract"
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Additional arguments for the contract"
+              },
+              "testToRun": {
+                "type": "string",
+                "description": "The specific test function to run. Used internally by CodeLens."
               }
             }
           }
-        }
+        },
+        "initialConfigurations": [
+          {
+            "type": "ink-trace",
+            "request": "launch",
+            "name": "Ink Trace: Launch",
+            "program": "${fileDirname}",
+            "stopOnEntry": true,
+            "args": []
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "Ink Trace: Launch Contract",
+            "description": "Debug an ink! smart contract",
+            "body": {
+              "type": "ink-trace",
+              "request": "launch",
+              "name": "Ink Trace: Launch",
+              "program": "${fileDirname}",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "ink-trace.debugTest",
+        "title": "Ink Trace: Debug Test"
       }
     ]
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
-    "@types/node": "20.x",
+    "@types/node": "^20.19.4",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
@@ -74,10 +101,9 @@
     "@vscode/test-electron": "^2.4.0",
     "eslint": "^8.57.0",
     "mocha": "^11.7.0",
-    "typescript": "^5.4.5"
-  },
-  "dependencies": {
+    "typescript": "^5.4.5",
     "@vscode/debugadapter": "^1.68.0",
     "@vscode/debugprotocol": "^1.68.0"
-  }
+  },
+  "dependencies": {}
 }

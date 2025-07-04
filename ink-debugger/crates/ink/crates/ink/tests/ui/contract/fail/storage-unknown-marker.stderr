@@ -1,0 +1,5 @@
+error: encountered unknown ink! attribute argument: unknown_or_unsupported
+ --> tests/ui/contract/fail/storage-unknown-marker.rs:6:11
+  |
+6 |     #[ink(unknown_or_unsupported)]
+  |           ^^^^^^^^^^^^^^^^^^^^^^

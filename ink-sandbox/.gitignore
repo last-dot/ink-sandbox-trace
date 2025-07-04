@@ -1,7 +1,0 @@
-/target/
-/snipets/
-
-**/*.rs.bk
-
-Cargo.lock
-*.asm

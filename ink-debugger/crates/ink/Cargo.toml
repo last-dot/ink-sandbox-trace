@@ -1,0 +1,127 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/allocator",
+    "crates/e2e",
+    "crates/e2e/macro",
+    "crates/e2e/sandbox",
+    "crates/engine",
+    "crates/env",
+    "crates/ink",
+    "crates/ink/codegen",
+    "crates/ink/ir",
+    "crates/ink/macro",
+    "crates/metadata",
+    "crates/prelude",
+    "crates/primitives",
+    "crates/storage",
+    "crates/storage/traits"
+]
+exclude = [
+    "integration-tests",
+    "linting",
+]
+
+[workspace.package]
+authors = ["Use Ink <ink@use.ink>"]
+categories = ["no-std", "embedded"]
+edition = "2021"
+homepage = "https://use.ink"
+keywords = ["polkavm", "ink", "riscv", "blockchain", "edsl"]
+license = "Apache-2.0"
+repository = "https://github.com/use-ink/ink"
+version = "6.0.0-alpha"
+
+[workspace.dependencies]
+arrayref = { version = "0.3" }
+array-init = { version = "2.0", default-features = false }
+blake2 = { version = "0.10" }
+cargo_metadata = { version = "0.19.0" }
+cfg-if = { version = "1.0" }
+contract-build = { version = "6.0.0-alpha.1", git = "https://github.com/use-ink/cargo-contract", branch = "master" }
+darling = { version = "0.20.11" }
+derive_more = { version = "2.0.1", default-features = false }
+either = { version = "1.13", default-features = false }
+funty = { version = "2.0.0" }
+heck = { version = "0.5.0" }
+impl-serde = { version = "0.5.0", default-features = false }
+itertools = { version = "0.14.0", default-features = false }
+jsonrpsee = { version = "0.24" }
+linkme = { version = "0.3" }
+num-traits = { version = "0.2", default-features = false }
+paste = { version = "1.0" }
+pretty_assertions = { version = "1" }
+proc-macro2 = { version = "1" }
+quickcheck = { version = "1" }
+quickcheck_macros = { version = "1" }
+quote = { version = "1" }
+scale = { package = "parity-scale-codec", version = "3.7.4", default-features = false, features = ["derive"] }
+scale-decode = { version = "0.16.0", default-features = false }
+scale-encode = { version = "0.10.0", default-features = false }
+scale-info = { version = "2.11", default-features = false }
+schemars = { version = "0.8" }
+secp256k1 = { version = "0.30.0" }
+serde = { version = "1.0.215", default-features = false }
+serde_json = { version = "1.0.137" }
+sha2 = { version = "0.10" }
+sha3 = { version = "0.10" }
+static_assertions = { version = "1.1" }
+subxt = { version = "0.42.1" }
+subxt-metadata = { version = "0.42.1" }
+subxt-signer = { version = "0.42.1" }
+syn = { version = "2" }
+synstructure = { version = "0.13.1" }
+thiserror = { version = "2.0.11" }
+tokio = { version = "1.44.2" }
+tracing = { version = "0.1.41" }
+tracing-subscriber = { version = "0.3.19" }
+trybuild = { version = "1.0.102" }
+which = { version = "7.0.0" }
+xxhash-rust = { version = "0.8" }
+const_env = { version = "0.1" }
+
+# Substrate dependencies
+frame-metadata = { version = "20.0.0", default-features = false }
+frame-system = { version = "40.1.0", default-features = false }
+frame-support = { version = "40.1.0", default-features = false }
+pallet-balances = { version = "41.1.0", default-features = false }
+pallet-timestamp = { version = "39.0.0", default-features = false }
+pallet-revive = { path = "../pallet-revive-0.5.0", default-features = false }
+pallet-revive-mock-network = { version = "0.4.0", default-features = false }
+pallet-revive-uapi = { version = "0.4.0", default-features = false, features = ["unstable-hostfn"] }
+sp-externalities = { version = "0.30.0", default-features = false }
+sp-io = { version = "40.0.0", default-features = false, features = ["disable_panic_handler", "disable_oom", "disable_allocator"] }
+sp-runtime-interface = { version = "29.0.1", default-features = false, features = ["disable_target_static_assertions"] }
+sp-core = { version = "36.1.0", default-features = false }
+sp-keyring = { version = "41.0.0", default-features = false }
+sp-runtime = "41.1.0"
+sp-weights = { version = "31.1.0", default-features = false }
+xcm = { package = "staging-xcm", version = "16.1.0", default-features = false }
+
+# PolkaVM dependencies
+polkavm-derive = { version = "0.22.0", default-features = false }
+
+# Solidity dependencies
+alloy-sol-types = { version = "1.0.0", default-features = false }
+const_format = { version = "0.2.34", features = ["fmt"] }
+keccak-const = "0.2.0"
+impl-trait-for-tuples = "0.2.3"
+
+# Local dependencies
+ink = { version = "=6.0.0-alpha", path = "crates/ink", default-features = false }
+ink_allocator = { version = "=6.0.0-alpha", path = "crates/allocator", default-features = false }
+ink_codegen = { version = "=6.0.0-alpha", path = "crates/ink/codegen", default-features = false }
+ink_e2e_macro = { version = "=6.0.0-alpha", path = "crates/e2e/macro", default-features = false }
+ink_engine = { version = "=6.0.0-alpha", path = "crates/engine", default-features = false }
+ink_env = { version = "=6.0.0-alpha", path = "crates/env", default-features = false }
+ink_ir = { version = "=6.0.0-alpha", path = "crates/ink/ir", default-features = false }
+ink_macro = { version = "=6.0.0-alpha", path = "crates/ink/macro", default-features = false }
+ink_metadata = { version = "=6.0.0-alpha", path = "crates/metadata", default-features = false }
+ink_prelude = { version = "=6.0.0-alpha", path = "crates/prelude", default-features = false }
+ink_primitives = { version = "=6.0.0-alpha", path = "crates/primitives", default-features = false }
+ink_storage = { version = "=6.0.0-alpha", path = "crates/storage", default-features = false }
+ink_storage_traits = { version = "=6.0.0-alpha", path = "crates/storage/traits", default-features = false }
+
+[profile.release]
+panic = "abort"
+lto = true

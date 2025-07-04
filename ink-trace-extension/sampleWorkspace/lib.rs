@@ -68,72 +68,44 @@ mod flipper {
     }
 
 
-    /// This is how you'd write end-to-end (E2E) or integration tests for ink! contracts.
-    ///
-    /// When running these you need to make sure that you:
-    /// - Compile the tests with the `e2e-tests` feature flag enabled (`--features e2e-tests`)
-    /// - Are running a Substrate node which contains `pallet-contracts` in the background
-    #[cfg(all(test, feature = "e2e-tests"))]
-    mod e2e_tests {
-        /// Imports all the definitions from the outer scope so we can use them here.
-        use super::*;
+    #[cfg(test)]
+    mod drink_tests {
+        use std::error::Error;
 
-        /// A helper function used for calling contract messages.
-        use ink_e2e::ContractsBackend;
+        use drink::session::{Session, NO_ARGS, NO_ENDOWMENT, NO_SALT};
 
-        /// The End-to-End test `Result` type.
-        type E2EResult<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+        #[drink::contract_bundle_provider]
+        enum BundleProvider {}
 
-        /// We test that we can upload and instantiate the contract using its default constructor.
-        #[ink_e2e::test]
-        async fn default_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
-            // Given
-            let mut constructor = FlipperRef::default();
+        #[drink::test]
+        fn initialization(mut session: Session) -> Result<(), Box<dyn Error>> {
+            let contract = BundleProvider::local()?;
+            let init_value: bool = session
+                .deploy_bundle_and(contract, "new", &["true"], NO_SALT, NO_ENDOWMENT)?
+                .call_and("get", NO_ARGS, NO_ENDOWMENT)?
+                .record()
+                .last_call_return_decoded()?
+                .expect("Call was successful");
 
-            // When
-            let contract = client
-                .instantiate("flipper", &ink_e2e::alice(), &mut constructor)
-                .submit()
-                .await
-                .expect("instantiate failed");
-            let call_builder = contract.call_builder::<Flipper>();
-
-            // Then
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::alice(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), false));
+            assert_eq!(init_value, true);
 
             Ok(())
         }
 
-        /// We test that we can read and write a value from the on-chain contract.
-        #[ink_e2e::test]
-        async fn it_works(mut client: ink_e2e::Client<C, E>) -> E2EResult<()> {
-            // Given
-            let mut constructor = FlipperRef::new(false);
-            let contract = client
-                .instantiate("flipper", &ink_e2e::bob(), &mut constructor)
-                .submit()
-                .await
-                .expect("instantiate failed");
-            let mut call_builder = contract.call_builder::<Flipper>();
+        #[drink::test]
+        fn flipping(mut session: Session) -> Result<(), Box<dyn Error>> {
+            let contract = BundleProvider::Flipper.bundle()?;
+            let init_value: bool = session
+                .deploy_bundle_and(contract, "new", &["true"], NO_SALT, NO_ENDOWMENT)?
+                .call_and("flip", NO_ARGS, NO_ENDOWMENT)?
+                .call_and("flip", NO_ARGS, NO_ENDOWMENT)?
+                .call_and("flip", NO_ARGS, NO_ENDOWMENT)?
+                .call_and("get", NO_ARGS, NO_ENDOWMENT)?
+                .record()
+                .last_call_return_decoded()?
+                .expect("Call was successful");
 
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::bob(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), false));
-
-            // When
-            let flip = call_builder.flip();
-            let _flip_result = client
-                .call(&ink_e2e::bob(), &flip)
-                .submit()
-                .await
-                .expect("flip failed");
-
-            // Then
-            let get = call_builder.get();
-            let get_result = client.call(&ink_e2e::bob(), &get).dry_run().await?;
-            assert!(matches!(get_result.return_value(), true));
+            assert_eq!(init_value, false);
 
             Ok(())
         }
