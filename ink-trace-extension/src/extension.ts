@@ -3,12 +3,20 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as child_process from 'child_process';
 import { InkCodeLensProvider } from './InkCodeLensProvider';
+import { InkDebugConfigurationProvider } from './InkDebugConfigurationProvider';
 
 export function activate(context: vscode.ExtensionContext) {
     console.log('Activating Ink! Trace Debugger extension...');
 
+    const debugAdapterFactory = new InkDebugAdapterDescriptorFactory(context);
     context.subscriptions.push(
-        vscode.debug.registerDebugAdapterDescriptorFactory('ink-trace', new InkDebugAdapterDescriptorFactory(context))
+        vscode.debug.registerDebugAdapterDescriptorFactory('ink-trace', debugAdapterFactory)
+    );
+    context.subscriptions.push(debugAdapterFactory); 
+
+
+    context.subscriptions.push(
+        vscode.debug.registerDebugConfigurationProvider('ink-trace', new InkDebugConfigurationProvider())
     );
 
     context.subscriptions.push(
@@ -16,23 +24,8 @@ export function activate(context: vscode.ExtensionContext) {
     );
 
     context.subscriptions.push(
-        vscode.commands.registerCommand('ink-trace.debugTest', (uri: vscode.Uri, testName: string) => {
-            const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
-            if (!workspaceFolder) {
-                vscode.window.showErrorMessage("Cannot start debugging: no workspace folder found for the current file.");
-                return;
-            }
-
-            const debugConfiguration: vscode.DebugConfiguration = {
-                type: 'ink-trace',
-                request: 'launch',
-                name: `Debug: ${testName}`,
-                program: uri.fsPath,
-                stopOnEntry: true,
-                testToRun: testName 
-            };
-            
-            vscode.debug.startDebugging(workspaceFolder, debugConfiguration);
+        vscode.commands.registerCommand('ink-trace.debugTest', async (uri: vscode.Uri, testName: string) => {
+            await handleDebugTestCommand(uri, testName);
         })
     );
 
@@ -43,9 +36,36 @@ export function deactivate() {
     console.log('Deactivating Ink! Trace Debugger extension.');
 }
 
-class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory {
+async function handleDebugTestCommand(uri: vscode.Uri, testName: string): Promise<void> {
+    const workspaceFolder = vscode.workspace.getWorkspaceFolder(uri);
+    if (!workspaceFolder) {
+        vscode.window.showErrorMessage("Cannot start debugging: no workspace folder found for the current file.");
+        return;
+    }
+
+    const debugConfiguration: vscode.DebugConfiguration = {
+        type: 'ink-trace',
+        request: 'launch',
+        name: `Debug: ${testName}`,
+        program: uri.fsPath,
+        stopOnEntry: true,
+        testToRun: testName
+    };
+
+    try {
+        const success = await vscode.debug.startDebugging(workspaceFolder, debugConfiguration);
+        if (!success) {
+            vscode.window.showErrorMessage('Failed to start debugging.');
+        }
+    } catch (err: any) {
+        vscode.window.showErrorMessage(`Debugging error: ${err.message}`);
+    }
+}
+
+class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorFactory, vscode.Disposable {
     private context: vscode.ExtensionContext;
-    private static isPreparingEnvironment = false; 
+    private static isPreparingEnvironment = false;
+    private serverProcess: child_process.ChildProcess | null = null;
 
     constructor(context: vscode.ExtensionContext) {
         this.context = context;
@@ -60,25 +80,21 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
         InkDebugAdapterDescriptorFactory.isPreparingEnvironment = true;
         try {
             const dapServerRoot = path.join(this.context.extensionPath, '..', 'ink-dap-server');
-            
             await this.ensurePythonEnvironment(dapServerRoot);
-            
+
             const pythonExecutable = this.getVenvExecutablePath(dapServerRoot, 'python');
             const serverScript = path.join(dapServerRoot, 'main.py');
 
-            if (!pythonExecutable || !fs.existsSync(pythonExecutable)) {
-                throw new Error("Failed to find Python executable in the virtual environment after setup.");
+            if (!fs.existsSync(pythonExecutable)) {
+                throw new Error(`Failed to find Python executable in the virtual environment at: ${pythonExecutable}`);
             }
+
             if (!fs.existsSync(serverScript)) {
-                throw new Error(`DAP server entry point not found at: ${serverScript}.`);
+                throw new Error(`DAP server entry point not found at: ${serverScript}`);
             }
 
-            const options: vscode.DebugAdapterExecutableOptions = {
-                cwd: dapServerRoot, 
-                env: this.getCleanEnvironment()
-            };
-
-            return new vscode.DebugAdapterExecutable(pythonExecutable, [serverScript], options);
+            return this.createExecutableDescriptor(dapServerRoot, pythonExecutable, serverScript);
+            
         } catch (error: any) {
             vscode.window.showErrorMessage(`Failed to set up the debug environment: ${error.message}`);
             throw error;
@@ -87,11 +103,54 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
         }
     }
 
+    private createExecutableDescriptor(dapServerRoot: string, pythonExecutable: string, serverScript: string): vscode.DebugAdapterExecutable {
+        const options: vscode.DebugAdapterExecutableOptions = {
+            cwd: dapServerRoot,
+            env: {
+                ...process.env,
+                "PYTHONPATH": path.join(dapServerRoot, 'src'),
+                "PYTHONUNBUFFERED": "1",
+                "RUST_LOG": "debug"
+            }
+        };
+
+        return new vscode.DebugAdapterExecutable(
+            pythonExecutable,
+            [serverScript],
+            options
+        );
+    }
+
+    private createServerDescriptor(dapServerRoot: string, pythonExecutable: string, serverScript: string): vscode.DebugAdapterServer {
+        const port = 5678; 
+        
+        if (!this.serverProcess) {
+            this.serverProcess = child_process.spawn(
+                pythonExecutable,
+                [serverScript, '--port', port.toString()],
+                {
+                    cwd: dapServerRoot,
+                    env: {
+                        ...process.env,
+                        "PYTHONPATH": path.join(dapServerRoot, 'src'),
+                        "PYTHONUNBUFFERED": "1",
+                        "RUST_LOG": "debug"
+                    },
+                    stdio: ['pipe', 'pipe', 'pipe']
+                }
+            );
+
+            this.serverProcess.stdout?.on('data', data => console.log(`DAP Server: ${data}`));
+            this.serverProcess.stderr?.on('data', data => console.error(`DAP Server Error: ${data}`));
+            this.serverProcess.on('close', code => console.log(`DAP Server exited with code ${code}`));
+        }
+
+        return new vscode.DebugAdapterServer(port);
+    }
+
     private async ensurePythonEnvironment(dapServerRoot: string): Promise<void> {
         const venvPath = path.join(dapServerRoot, '.venv');
-        if (fs.existsSync(venvPath)) {
-            return; 
-        }
+        if (fs.existsSync(venvPath)) return;
 
         const globalPython = await this.findGlobalPython();
         if (!globalPython) {
@@ -105,14 +164,25 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
         }, async (progress) => {
             progress.report({ message: "Creating virtual environment..." });
             await this.runCommand(globalPython, ['-m', 'venv', '.venv'], dapServerRoot);
-            
+
+            const pythonInVenv = this.getVenvExecutablePath(dapServerRoot, 'python');
+            let attempts = 10;
+            while (!fs.existsSync(pythonInVenv) && attempts > 0) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                attempts--;
+            }
+
+            if (!fs.existsSync(pythonInVenv)) {
+                throw new Error(`Failed to create virtual environment. Python executable not found at ${pythonInVenv}.`);
+            }
+
             progress.report({ message: "Installing dependencies..." });
             const pipExecutable = this.getVenvExecutablePath(dapServerRoot, 'pip');
             const requirementsPath = path.join(dapServerRoot, 'requirements.txt');
             await this.runCommand(pipExecutable, ['install', '-r', requirementsPath], dapServerRoot);
-            
+
             progress.report({ message: "Setup complete!" });
-            await new Promise(resolve => setTimeout(resolve, 1500)); 
+            await new Promise(resolve => setTimeout(resolve, 1500));
         });
     }
 
@@ -121,15 +191,12 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
         for (const cmd of candidates) {
             try {
                 const output = await this.runCommand(cmd, ['--version']);
-                if (output.includes("Python 3")) {
-                    return cmd;
-                }
-            } catch {
-            }
+                if (output.includes("Python 3")) return cmd;
+            } catch {}
         }
         return null;
     }
-    
+
     private getVenvExecutablePath(dapServerRoot: string, executableName: 'python' | 'pip'): string {
         const exe = process.platform === 'win32' ? `${executableName}.exe` : executableName;
         return path.join(dapServerRoot, '.venv', process.platform === 'win32' ? 'Scripts' : 'bin', exe);
@@ -137,7 +204,11 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
 
     private runCommand(cmd: string, args: string[], cwd?: string): Promise<string> {
         return new Promise((resolve, reject) => {
-            child_process.execFile(cmd, args, { cwd, shell: process.platform === 'win32' }, (error, stdout, stderr) => {
+            const proc = child_process.execFile(cmd, args, { 
+                cwd, 
+                shell: process.platform === 'win32',
+                timeout: 30000
+            }, (error, stdout, stderr) => {
                 if (error) {
                     reject(new Error(stderr || error.message));
                 } else {
@@ -147,14 +218,10 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
         });
     }
 
-    private getCleanEnvironment(): { [key: string]: string } {
-        const cleanEnv: { [key: string]: string } = {};
-        for (const key in process.env) {
-            const value = process.env[key];
-            if (typeof value === 'string') {
-                cleanEnv[key] = value;
-            }
+    dispose() {
+        if (this.serverProcess) {
+            this.serverProcess.kill();
+            this.serverProcess = null;
         }
-        return cleanEnv;
     }
 }
