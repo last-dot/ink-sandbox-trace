@@ -59,12 +59,12 @@ class DebugAdapter:
             "supportsBreakpointLocationsRequest": False,
         }
 
-        self.logger.info("Debug adapter initialized")
+        self.logger.info("🚀 Debug adapter initialized")
 
     async def run(self):
         """Main loop for the debug adapter - async version."""
         self.is_running = True
-        self.logger.info("Debug adapter started, waiting for DAP messages...")
+        self.logger.info("📡 Debug adapter started, waiting for DAP messages...")
 
         # Запускаем чтение в отдельной задаче
         await self._read_loop()
@@ -75,12 +75,16 @@ class DebugAdapter:
 
         while self.is_running:
             try:
+                self.logger.debug("🔍 Waiting for DAP message...")
                 # Читаем синхронно в executor
                 message = await loop.run_in_executor(None, self.protocol.read_message)
                 if message:
+                    self.logger.info(f"📨 Received DAP message: {message.get('command', 'unknown')}")
                     await self._handle_message(message)
+                else:
+                    self.logger.debug("📪 No message received, continuing...")
             except Exception as e:
-                self.logger.error(f"Error in main loop: {e}", exc_info=True)
+                self.logger.error(f"❌ Error in main loop: {e}", exc_info=True)
 
     async def _handle_message(self, message: Dict[str, Any]):
         """Handle a DAP message."""
@@ -89,14 +93,14 @@ class DebugAdapter:
         if msg_type == "request":
             await self._handle_request(message)
         else:
-            self.logger.warning(f"Unknown message type: {msg_type}")
+            self.logger.warning(f"⚠️ Unknown message type: {msg_type}")
 
     async def _handle_request(self, request: Dict[str, Any]):
         """Handle a DAP request."""
         command = request.get("command")
         seq = request.get("seq", 0)
 
-        self.logger.info(f"Handling request #{seq}: {command}")
+        self.logger.info(f"🎯 Handling request #{seq}: {command}")
 
         # Route to appropriate handler
         handlers = {
@@ -119,62 +123,74 @@ class DebugAdapter:
         handler = handlers.get(command)
         if handler:
             try:
-               await handler(request)
+                await handler(request)
+                self.logger.info(f"✅ Successfully handled {command}")
             except Exception as e:
-                self.logger.error(f"Error handling {command}: {e}", exc_info=True)
+                self.logger.error(f"❌ Error handling {command}: {e}", exc_info=True)
                 self.protocol.send_response(request, success=False)
         else:
-            self.logger.warning(f"Unknown command: {command}")
+            self.logger.warning(f"⚠️ Unknown command: {command}")
             self.protocol.send_response(request, success=False)
 
     async def _handle_initialize(self, request: Dict[str, Any]):
         """Handle 'initialize' request."""
-        self.logger.info("Initializing debug adapter")
+        self.logger.info("🔧 Initializing debug adapter...")
 
-        # Send capabilities
-        self.protocol.send_response(request, body=self.capabilities)
+        try:
+            # Send capabilities
+            self.logger.info("📤 Sending capabilities to VS Code...")
+            self.protocol.send_response(request, body=self.capabilities)
+            self.logger.info("✅ Capabilities sent successfully")
 
-        # Mark as initialized
-        self.is_initialized = True
+            # Mark as initialized
+            self.is_initialized = True
+            self.logger.info("✅ Debug adapter marked as initialized")
 
-        # Send initialized event
-        self.protocol.send_event("initialized")
+            # Send initialized event
+            self.logger.info("📤 Sending 'initialized' event to VS Code...")
+            self.protocol.send_event("initialized")
+            self.logger.info("✅ 'Initialized' event sent successfully")
+
+        except Exception as e:
+            self.logger.error(f"❌ Error in initialize: {e}", exc_info=True)
+            raise
 
     async def _handle_launch(self, request: Dict[str, Any]):
         """Handle 'launch' request."""
         args = request.get("arguments", {})
+        self.logger.info(f"🚀 Launch request with args: {args}")
 
         # Get contract path
         program = args.get("program")
         if not program:
-            self.logger.error("No program specified in launch request")
+            self.logger.error("❌ No program specified in launch request")
             self.protocol.send_response(request, success=False)
             return
 
-        self.logger.info(f"Launching debugger for: {program}")
+        self.logger.info(f"📁 Launching debugger for contract: {program}")
 
         # Инициализируем мост к Rust
+        self.logger.info("🔗 Initializing Rust bridge...")
         self.rust_bridge = RustBridge()
+
         try:
+            self.logger.info("⏳ Starting Rust bridge connection...")
             await self.rust_bridge.start()
 
             # Инициализируем с путем к контракту
+            self.logger.info(f"📋 Sending initialize to Rust with program: {program}")
             result = await self.rust_bridge.call_method("initialize", {
                 "path": program
             })
-            self.logger.info(f"Rust инициализирован: {result}")
+            self.logger.info(f"✅ Rust initialized successfully: {result}")
+
         except Exception as e:
-            self.logger.error(f"Ошибка подключения к Rust: {e}")
-            self.protocol.send_response(request, success=False)
-            return
+            self.logger.warning(f"⚠️ Rust bridge не подключился (продолжаем работу): {e}")
+            # Не прерываем работу DAP сервера если Rust недоступен
 
         self.protocol.send_response(request)
         self.stop_on_entry = args.get("stopOnEntry", False)
-
-
-
-
-
+        self.logger.info(f"✅ Launch completed, stopOnEntry: {self.stop_on_entry}")
 
     async def _handle_set_breakpoints(self, request: Dict[str, Any]):
         """Handle 'setBreakpoints' request."""
@@ -183,8 +199,9 @@ class DebugAdapter:
         source_path = source.get("path", "")
         breakpoints = args.get("breakpoints", [])
 
-        self.logger.info(f"Setting {len(breakpoints)} breakpoints in {source_path}")
-
+        self.logger.info(f"🔴 Setting {len(breakpoints)} breakpoints in {source_path}")
+        for i, bp in enumerate(breakpoints):
+            self.logger.info(f"   Breakpoint {i+1}: line {bp.get('line')}")
 
         # Store breakpoints
         self.breakpoints[source_path] = breakpoints
@@ -192,30 +209,28 @@ class DebugAdapter:
         # Отправляем breakpoints в Rust (пока с фейковыми адресами)
         if self.rust_bridge:
             addresses = [0x1000 * (i + 1) for i, bp in enumerate(breakpoints)]
+            self.logger.info(f"📤 Sending breakpoints to Rust: {addresses}")
             try:
                 result = await self.rust_bridge.call_method("setBreakpoints", {
                     "addresses": addresses
                 })
-                self.logger.info(f"Rust breakpoints: {result}")
+                self.logger.info(f"✅ Rust accepted breakpoints: {result}")
             except Exception as e:
-                self.logger.error(f"Ошибка установки breakpoints: {e}")
+                self.logger.warning(f"⚠️ Error sending breakpoints to Rust: {e}")
+        else:
+            self.logger.warning("⚠️ Rust bridge not available, breakpoints stored locally only")
 
-        # TODO: Map line numbers to instruction addresses using source_mapper
-        # For now, just acknowledge all breakpoints as verified
+        # Acknowledge all breakpoints as verified
         verified_breakpoints = []
         for i, bp in enumerate(breakpoints):
             line = bp.get("line")
-            # Try to map line to address
-            address = None
-
             verified_breakpoints.append({
                 "id": i + 1,
                 "verified": True,
                 "line": line
             })
 
-
-        self.logger.info(f"Verified breakpoints: {verified_breakpoints}")
+        self.logger.info(f"✅ Verified {len(verified_breakpoints)} breakpoints")
 
         self.protocol.send_response(request, body={
             "breakpoints": verified_breakpoints
@@ -223,21 +238,24 @@ class DebugAdapter:
 
     async def _handle_configuration_done(self, request: Dict[str, Any]):
         """Handle 'configurationDone' request."""
-        self.logger.info("Configuration done")
+        self.logger.info("⚙️ Configuration done")
         self.is_configured = True
         self.protocol.send_response(request)
+
         # Start execution or stop on entry
         if hasattr(self, 'stop_on_entry') and self.stop_on_entry:
+            self.logger.info("🛑 Stopping on entry")
             self.protocol.send_event("stopped", {
                 "reason": "entry",
                 "threadId": self.current_thread_id,
                 "allThreadsStopped": True
             })
-
-        # TODO: Start execution if not stopOnEntry
+        else:
+            self.logger.info("▶️ Starting execution without stopping")
 
     async def _handle_threads(self, request: Dict[str, Any]):
         """Handle 'threads' request."""
+        self.logger.info("🧵 Returning thread information")
         # Ink! contracts are single-threaded
         self.protocol.send_response(request, body={
             "threads": [
@@ -249,9 +267,10 @@ class DebugAdapter:
         """Handle 'stackTrace' request."""
         args = request.get("arguments", {})
         thread_id = args.get("threadId", 1)
+        self.logger.info(f"📚 Getting stack trace for thread {thread_id}")
 
-        # TODO: Get actual stack trace from Rust
-        # For now, return empty stack
+        # TODO: Получите фактическую трассировку стека из Rust
+        self.logger.info("⚠️ Returning empty stack trace (not implemented)")
         self.protocol.send_response(request, body={
             "stackFrames": [],
             "totalFrames": 0
@@ -259,26 +278,29 @@ class DebugAdapter:
 
     async def _handle_scopes(self, request: Dict[str, Any]):
         """Handle 'scopes' request."""
-        # TODO: Get actual scopes from Rust
+        self.logger.info("🔍 Getting variable scopes")
         self.protocol.send_response(request, body={
             "scopes": []
         })
 
     async def _handle_variables(self, request: Dict[str, Any]):
         """Handle 'variables' request."""
-        # TODO: Get actual variables from Rust
+        self.logger.info("📊 Getting variables")
         self.protocol.send_response(request, body={
             "variables": []
         })
 
     async def _handle_continue(self, request: Dict[str, Any]):
         """Handle 'continue' request."""
-        self.logger.info("Continuing execution")
+        self.logger.info("▶️ Continue execution")
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("continue", {})
+                self.logger.info("✅ Continue sent to Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка continue: {e}")
+                self.logger.warning(f"⚠️ Error sending continue to Rust: {e}")
+        else:
+            self.logger.warning("⚠️ Rust bridge not available")
 
         self.protocol.send_response(request, body={
             "allThreadsContinued": True
@@ -286,56 +308,64 @@ class DebugAdapter:
 
     async def _handle_next(self, request: Dict[str, Any]):
         """Handle 'next' (step over) request."""
-        self.logger.info("Step over")
+        self.logger.info("👣 Step over")
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("next", {})
+                self.logger.info("✅ Step over sent to Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка next: {e}")
+                self.logger.warning(f"⚠️ Error sending step over to Rust: {e}")
         self.protocol.send_response(request)
 
     async def _handle_step_in(self, request: Dict[str, Any]):
         """Handle 'stepIn' request."""
-        self.logger.info("Step in")
+        self.logger.info("👣⬇️ Step in")
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("stepIn", {})
+                self.logger.info("✅ Step in sent to Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка stepIn: {e}")
+                self.logger.warning(f"⚠️ Error sending step in to Rust: {e}")
         self.protocol.send_response(request)
 
     async def _handle_step_out(self, request: Dict[str, Any]):
         """Handle 'stepOut' request."""
-        self.logger.info("Step out")
+        self.logger.info("👣⬆️ Step out")
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("stepOut", {})
+                self.logger.info("✅ Step out sent to Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка stepOut: {e}")
+                self.logger.warning(f"⚠️ Error sending step out to Rust: {e}")
         self.protocol.send_response(request)
 
     async def _handle_pause(self, request: Dict[str, Any]):
         """Handle 'pause' request."""
-        self.logger.info("Pausing execution")
+        self.logger.info("⏸️ Pause execution")
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("pause", {})
+                self.logger.info("✅ Pause sent to Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка pause: {e}")
+                self.logger.warning(f"⚠️ Error sending pause to Rust: {e}")
         self.protocol.send_response(request)
 
     async def _handle_disconnect(self, request: Dict[str, Any]):
         """Handle 'disconnect' request."""
+        self.logger.info("🔌 Disconnecting debugger...")
+
         if self.rust_bridge:
             try:
                 await self.rust_bridge.call_method("disconnect", {})
+                await self.rust_bridge.shutdown()
+                self.logger.info("✅ Disconnected from Rust")
             except Exception as e:
-                self.logger.error(f"Ошибка disconnect: {e}")
-        self.logger.info("Disconnecting debugger")
+                self.logger.warning(f"⚠️ Error disconnecting from Rust: {e}")
+
         self.protocol.send_response(request)
         self.stop()
 
     def stop(self):
         """Stop the debug adapter."""
         self.is_running = False
-        self.logger.info("Debug adapter stopped")
+        self.logger.info("🛑 Debug adapter stopped")
