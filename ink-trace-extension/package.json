@@ -7,9 +7,7 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": [
-    "Debuggers"
-  ],
+  "categories": ["Debuggers"],
   "activationEvents": [
     "onDebugResolve:ink-trace",
     "onDebugInitialConfigurations",
@@ -29,12 +27,11 @@
     "debuggers": [
       {
         "type": "ink-trace",
-        "label": "Ink Trace Debug",
+        "label": "Ink Trace Debugger",
+        "languages": ["rust"],
         "configurationAttributes": {
           "launch": {
-            "required": [
-              "program"
-            ],
+            "required": ["program"],
             "properties": {
               "program": {
                 "type": "string",
@@ -47,9 +44,7 @@
               },
               "args": {
                 "type": "array",
-                "items": {
-                  "type": "string"
-                },
+                "items": { "type": "string" },
                 "description": "Additional arguments for the contract"
               },
               "testToRun": {
@@ -97,13 +92,12 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^7.11.0",
     "@typescript-eslint/parser": "^7.11.0",
+    "@vscode/debugadapter": "^1.68.0",
+    "@vscode/debugprotocol": "^1.68.0",
     "@vscode/test-cli": "^0.0.9",
     "@vscode/test-electron": "^2.4.0",
     "eslint": "^8.57.0",
     "mocha": "^11.7.0",
-    "typescript": "^5.4.5",
-    "@vscode/debugadapter": "^1.68.0",
-    "@vscode/debugprotocol": "^1.68.0"
-  },
-  "dependencies": {}
+    "typescript": "^5.4.5"
+  }
 }
