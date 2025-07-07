@@ -124,8 +124,9 @@ class InkDebugAdapterDescriptorFactory implements vscode.DebugAdapterDescriptorF
                 if (output.includes("Python 3")) {
                     return cmd;
                 }
-            } catch {
-            }
+            } catch (err: any) {
+            vscode.window.showWarningMessage(`Failed to run '${cmd} --version': ${err.message}`);
+        }
         }
         return null;
     }
