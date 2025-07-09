@@ -2,7 +2,7 @@
 """
 Ink! v6 Debug Adapter for VS Code
 Main entry point for the debug adapter server
-логирование в файл debug_adapter.log
+С подробным логированием в файл debug_adapter.log
 """
 
 import sys
@@ -74,7 +74,8 @@ def main():
 
         # Additional crash log for debugging
         try:
-            crash_log = Path(__file__).parent / "crash.log"
+            # Пишем crash.log в корневую директорию (рядом с debug_adapter.log)
+            crash_log = Path(__file__).parent.parent / "crash.log"
             with open(crash_log, "w", encoding='utf-8') as f:
                 f.write(f"CRASH TIMESTAMP: {sys.version}\n")
                 f.write(f"ERROR: {e}\n")
