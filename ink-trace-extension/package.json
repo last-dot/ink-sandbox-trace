@@ -7,7 +7,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "categories": ["Debuggers"],
+  "categories": [
+    "Debuggers"
+  ],
   "activationEvents": [
     "onDebugResolve:ink-trace",
     "onDebugInitialConfigurations",
@@ -28,10 +30,14 @@
       {
         "type": "ink-trace",
         "label": "Ink Trace Debugger",
-        "languages": ["rust"],
+        "languages": [
+          "rust"
+        ],
         "configurationAttributes": {
           "launch": {
-            "required": ["program"],
+            "required": [
+              "program"
+            ],
             "properties": {
               "program": {
                 "type": "string",
@@ -44,7 +50,9 @@
               },
               "args": {
                 "type": "array",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "description": "Additional arguments for the contract"
               },
               "testToRun": {
