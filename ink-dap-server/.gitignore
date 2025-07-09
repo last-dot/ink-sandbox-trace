@@ -1,9 +1,9 @@
-# Лог файлы - не коммитим
+# Log files - don't commit
 debug_adapter.log
 crash.log
 *.log
 
-# Python кеш
+# Python cache
 __pycache__/
 *.pyc
 *.pyo
@@ -26,20 +26,20 @@ wheels/
 *.egg
 MANIFEST
 
-# Виртуальные окружения
+# Virtual environments
 .venv/
 venv/
 ENV/
 env/
 
-# IDE файлы
+# IDE files
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# OS файлы
+# OS files
 .DS_Store
 .DS_Store?
 ._*

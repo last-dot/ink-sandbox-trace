@@ -1,6 +1,7 @@
 """
 Debug Adapter Protocol implementation for Ink! v6
 Handles communication between VS Code and the Rust debugger
+With enhanced logging and error handling
 """
 
 import sys
@@ -66,7 +67,7 @@ class DebugAdapter:
         self.is_running = True
         self.logger.info("📡 Debug adapter started, waiting for DAP messages...")
 
-        # Запускаем чтение в отдельной задаче
+        # Start reading in separate task
         await self._read_loop()
 
     async def _read_loop(self):
@@ -76,7 +77,7 @@ class DebugAdapter:
         while self.is_running:
             try:
                 self.logger.debug("🔍 Waiting for DAP message...")
-                # Читаем синхронно в executor
+                # Read synchronously in executor
                 message = await loop.run_in_executor(None, self.protocol.read_message)
                 if message:
                     self.logger.info(f"📨 Received DAP message: {message.get('command', 'unknown')}")
@@ -169,7 +170,7 @@ class DebugAdapter:
 
         self.logger.info(f"📁 Launching debugger for contract: {program}")
 
-        # Инициализируем мост к Rust
+        # Initialize Rust bridge
         self.logger.info("🔗 Initializing Rust bridge...")
         self.rust_bridge = RustBridge()
 
@@ -177,7 +178,7 @@ class DebugAdapter:
             self.logger.info("⏳ Starting Rust bridge connection...")
             await self.rust_bridge.start()
 
-            # Инициализируем с путем к контракту
+            # Initialize with contract path
             self.logger.info(f"📋 Sending initialize to Rust with program: {program}")
             result = await self.rust_bridge.call_method("initialize", {
                 "path": program
@@ -185,8 +186,8 @@ class DebugAdapter:
             self.logger.info(f"✅ Rust initialized successfully: {result}")
 
         except Exception as e:
-            self.logger.warning(f"⚠️ Rust bridge не подключился (продолжаем работу): {e}")
-            # Не прерываем работу DAP сервера если Rust недоступен
+            self.logger.warning(f"⚠️ Rust bridge connection failed (continuing work): {e}")
+            # Don't interrupt DAP server work if Rust is unavailable
 
         self.protocol.send_response(request)
         self.stop_on_entry = args.get("stopOnEntry", False)
@@ -206,7 +207,7 @@ class DebugAdapter:
         # Store breakpoints
         self.breakpoints[source_path] = breakpoints
 
-        # Отправляем breakpoints в Rust (пока с фейковыми адресами)
+        # Send breakpoints to Rust (with fake addresses for now)
         if self.rust_bridge:
             addresses = [0x1000 * (i + 1) for i, bp in enumerate(breakpoints)]
             self.logger.info(f"📤 Sending breakpoints to Rust: {addresses}")
@@ -269,7 +270,7 @@ class DebugAdapter:
         thread_id = args.get("threadId", 1)
         self.logger.info(f"📚 Getting stack trace for thread {thread_id}")
 
-        # TODO: Получите фактическую трассировку стека из Rust
+        # TODO: Get actual stack trace from Rust
         self.logger.info("⚠️ Returning empty stack trace (not implemented)")
         self.protocol.send_response(request, body={
             "stackFrames": [],

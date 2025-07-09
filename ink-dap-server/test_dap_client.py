@@ -217,7 +217,7 @@ class TestDAPClient:
             self.send_request("disconnect")
             time.sleep(1)
 
-            # Читаем все логи stderr
+            # Read all stderr logs
             if self.process:
                 remaining_stderr = self.process.stderr.read()
                 if remaining_stderr:

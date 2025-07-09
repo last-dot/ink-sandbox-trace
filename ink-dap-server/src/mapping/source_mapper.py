@@ -1,6 +1,6 @@
 """
-Сопоставление исходного кода с инструкциями
-Сопоставление строк исходного файла с адресами инструкций PolkaVM
+Source code to instructions mapping
+Maps source file lines to PolkaVM instruction addresses
 """
 
 import subprocess
@@ -11,7 +11,7 @@ from pathlib import Path
 
 
 class SourceMapper:
-    """Сопоставляет строки исходного кода с адресами инструкций."""
+    """Maps source code lines to instruction addresses."""
 
     def __init__(self):
         self.logger = logging.getLogger("InkDebugAdapter.SourceMapper")
@@ -22,15 +22,15 @@ class SourceMapper:
 
     def load_debug_info(self, elf_path: str):
         """
-        Загрузка отладочной информации из ELF-файла с помощью readelf.
+        Load debug information from ELF file using readelf.
 
         Args:
-        elf_path: Путь к ELF-файлу
+            elf_path: Path to ELF file
         """
-        self.logger.info(f"Загрузка отладочной информации из: {elf_path}")
+        self.logger.info(f"Loading debug information from: {elf_path}")
 
         try:
-            # Запускаем readelf, чтобы получить информацию о строках отладки
+            # Run readelf to get debug line information
             result = subprocess.run(
                 ["readelf", "--debug-dump=decodedline", elf_path],
                 capture_output=True,
@@ -38,25 +38,25 @@ class SourceMapper:
                 check=True
             )
 
-            # Парсим вывод
+            # Parse output
             self._parse_readelf_output(result.stdout)
 
-            self.logger.info(f"Загружено {len(self.mappings)} line mappings")
+            self.logger.info(f"Loaded {len(self.mappings)} line mappings")
 
         except subprocess.CalledProcessError as e:
-            self.logger.error(f"Не удалось запустить readelf: {e}")
+            self.logger.error(f"Failed to run readelf: {e}")
             raise
         except FileNotFoundError:
-            self.logger.error("readelf не найден. Пожалуйста, установите binutils.")
+            self.logger.error("readelf not found. Please install binutils.")
             raise
 
     def _parse_readelf_output(self, output: str):
-        """Parse readelf  для извлечения отображений строк."""
-        # Пример вывода readelf:
+        """Parse readelf output to extract line mappings."""
+        # Example readelf output:
         # lib.rs                                        8           0x12f1e       48
         # lib.rs                                       30           0x12f32       51
 
-        # Шаблон для сопоставления строк вывода readelf
+        # Pattern to match readelf output lines
         pattern = r'(\S+\.rs)\s+(\d+)\s+0x([0-9a-fA-F]+)'
 
         for line in output.split('\n'):
@@ -74,53 +74,53 @@ class SourceMapper:
 
     def line_to_address(self, file: str, line: int) -> Optional[int]:
         """
-        Преобразование исходной строки в адрес инструкции.
+        Convert source line to instruction address.
 
         Args:
-         file: Имя исходного файла
-         line: Номер строки
+            file: Source file name
+            line: Line number
 
-        Возвращает:
-            Адрес инструкции или None, если он не найден
+        Returns:
+            Instruction address or None if not found
         """
-        # Пробуем использовать только имя файла (не полный путь)
+        # Try using only filename (not full path)
         filename = Path(file).name
         address = self.mappings.get((filename, line))
 
         if address is not None:
             self.logger.debug(f"Mapped {filename}:{line} → 0x{address:x}")
         else:
-            self.logger.warning(f"No mapping найденный для {filename}:{line}")
+            self.logger.warning(f"No mapping found for {filename}:{line}")
 
         return address
 
     def address_to_line(self, address: int) -> Optional[Tuple[str, int]]:
         """
-        Преобразование адреса инструкции в исходную строку.
+        Convert instruction address to source line.
 
         Args:
-        address: Адрес инструкции
+            address: Instruction address
 
-        Возвращает:
-            Кортеж из (filename, line) или None, если не найден.
+        Returns:
+            Tuple of (filename, line) or None if not found
         """
         return self.reverse_mappings.get(address)
 
     def find_nearest_address(self, file: str, line: int) -> Optional[int]:
         """
-        Находит ближайший сопоставленный адрес для заданной линии.
-        Полезно, когда точного отображения линии не существует.
+        Find nearest mapped address for given line.
+        Useful when exact line mapping doesn't exist.
 
         Args:
-         file: Имя исходного файла
-         line: Номер строки
+            file: Source file name
+            line: Line number
 
-        Возвращает:
-            Ближайший адрес инструкции или None
+        Returns:
+            Nearest instruction address or None
         """
         filename = Path(file).name
 
-        # Находим все строки для этого файла
+        # Find all lines for this file
         file_lines = [
             (l, addr) for (f, l), addr in self.mappings.items()
             if f == filename
@@ -129,10 +129,10 @@ class SourceMapper:
         if not file_lines:
             return None
 
-        # Сортируем по номеру строки
+        # Sort by line number
         file_lines.sort(key=lambda x: x[0])
 
-        # Находим ближайшую линию
+        # Find nearest line
         best_line = None
         best_addr = None
         min_diff = float('inf')
@@ -146,7 +146,7 @@ class SourceMapper:
 
         if best_addr:
             self.logger.debug(
-                f"Ближайшее отображение для {filename}:{line} это "
+                f"Nearest mapping for {filename}:{line} is "
                 f"{filename}:{best_line} → 0x{best_addr:x}"
             )
 
@@ -154,13 +154,13 @@ class SourceMapper:
 
     def get_file_lines(self, file: str) -> List[int]:
         """
-        Получает все маперы номера строк для файла.
+        Get all mapped line numbers for a file.
 
         Args:
-        file: Имя исходного файла
+            file: Source file name
 
-        Возвращает:
-            Список номеров строк, которые имеют мапер
+        Returns:
+            List of line numbers that have mappings
         """
         filename = Path(file).name
         lines = [
@@ -171,15 +171,15 @@ class SourceMapper:
 
     def apply_address_offset(self, offset: int):
         """
-        Применить смещение ко всем адресам.
-        Необходимо, когда адреса ELF не совпадают с адресами времени выполнения.
+        Apply offset to all addresses.
+        Needed when ELF addresses don't match runtime addresses.
 
         Args:
-        offset: Смещение для применения (может быть отрицательным)
+            offset: Offset to apply (can be negative)
         """
-        self.logger.info(f"Применение смещения адреса: {offset:#x}")
+        self.logger.info(f"Applying address offset: {offset:#x}")
 
-        # Создание новых маперов со смещением
+        # Create new mappings with offset
         new_mappings = {}
         new_reverse = {}
 
