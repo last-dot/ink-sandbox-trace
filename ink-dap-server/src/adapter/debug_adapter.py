@@ -118,6 +118,7 @@ class DebugAdapter:
             "stepIn": self._handle_step_in,
             "stepOut": self._handle_step_out,
             "pause": self._handle_pause,
+            "terminate": self._handle_terminate,
             "disconnect": self._handle_disconnect,
         }
 
@@ -350,6 +351,24 @@ class DebugAdapter:
             except Exception as e:
                 self.logger.warning(f"⚠️ Error sending pause to Rust: {e}")
         self.protocol.send_response(request)
+
+    async def _handle_terminate(self, request: Dict[str, Any]):
+        """Handle 'terminate' request."""
+        self.logger.info("🛑 Terminating debuggee...")
+
+        if self.rust_bridge:
+            try:
+                # Tell Rust to terminate the contract execution
+                await self.rust_bridge.call_method("terminate", {})
+                self.logger.info("✅ Terminate sent to Rust")
+            except Exception as e:
+                self.logger.warning(f"⚠️ Error sending terminate to Rust: {e}")
+
+        self.protocol.send_response(request)
+
+        # VS Code expects a 'terminated' event after successful termination
+        self.protocol.send_event("terminated")
+        self.logger.info("📤 Sent 'terminated' event to VS Code")
 
     async def _handle_disconnect(self, request: Dict[str, Any]):
         """Handle 'disconnect' request."""
