@@ -1,7 +1,0 @@
-pre: gas = 10000
-
-pub @main:
-pub @expected_exit:
-    trap
-
-post: gas = 9999

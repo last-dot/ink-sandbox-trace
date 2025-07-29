@@ -203,11 +203,11 @@ version = "1.0.15"
 default-features = false
 
 [dependencies.polkavm]
-path = "../polkavm-0.21.0/crates/polkavm"
+version = "0.21.0"
 features = ["generic-sandbox"]
 
 [dependencies.polkavm-common]
-path = "../polkavm-0.21.0/crates/polkavm-common"
+version = "0.21.0"
 optional = true
 default-features = false
 

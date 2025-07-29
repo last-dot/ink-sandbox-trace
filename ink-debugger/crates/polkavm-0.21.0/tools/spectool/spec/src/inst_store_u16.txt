@@ -1,9 +1,0 @@
-%rw_data_size = 1
-
-pre: a0 = 0x12345678
-pre: gas = 10000
-
-pub @main:
-    u16 [0x20000] = a0
-
-post: gas = 9998
