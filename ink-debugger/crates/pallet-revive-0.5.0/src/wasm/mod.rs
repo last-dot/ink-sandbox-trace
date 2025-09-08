@@ -45,8 +45,6 @@ use frame_support::{
 	traits::{fungible::MutateHold, tokens::Precision::BestEffort},
 };
 use ink_debug_rpc::SandboxRpc;
-use polkavm_common::program::ProgramBlob;
-use polkavm_common::utils::ArcBytes;
 use sp_core::{Get, H256, U256};
 use sp_runtime::DispatchError;
 
