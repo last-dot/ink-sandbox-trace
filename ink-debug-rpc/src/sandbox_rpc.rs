@@ -1,17 +1,16 @@
-use polkavm::RawInstance;
-use serde_json::{Value, to_value};
-use std::{
-    io::{Error, ErrorKind},
-    net::SocketAddr,
-};
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::{TcpListener, TcpSocket},
-};
-
 use crate::{
     domain::{JsonRpcError, JsonRpcRequest},
     methods,
+};
+use object::{Object, ObjectSection};
+use polkavm::{ArcBytes, Module, ProgramBlob, RawInstance};
+use serde_json::{to_value, Value};
+use std::path::{Path, PathBuf};
+use std::{borrow, error, io::{Error, ErrorKind}, net::SocketAddr, path};
+use tokio::io::AsyncSeekExt;
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::{TcpListener, TcpSocket},
 };
 
 #[derive(Debug, Clone)]
@@ -105,6 +104,7 @@ impl SandboxRpc {
     }
 
     pub fn step(&self, instance: &RawInstance) {
+        let p: PathBuf = "contract.pvm".into();
         log::debug!("[Sandbox Rpc] Step");
         let pc = instance
             .program_counter()

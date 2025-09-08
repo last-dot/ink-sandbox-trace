@@ -6,6 +6,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [Unreleased]
 
+### Changed
+- Synchronized with `polkadot-sdk/c40b36c3a7c208f9a6837b80812473af3d9ba7f7` ‒ [2102](https://github.com/use-ink/cargo-contract/pull/2102)
+
 ## [6.0.0-alpha.1]
 
 ### Added
@@ -29,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow setting target directory for contract builds - [#2063](https://github.com/use-ink/cargo-contract/pull/2063)
 - Include ABI declaration in new project template - [#2066](https://github.com/use-ink/cargo-contract/pull/2066)
 - Synchronized with `polkadot-sdk/cb629d46ebf00aa65624013a61f9c69ebf02b0b4` - [#2077](https://github.com/use-ink/cargo-contract/pull/2077)
+- ABI specific target directories for intermediate build artifacts - [#2089](https://github.com/use-ink/cargo-contract/pull/2089)
+- Add errors to Solidity metadata - [#2098](https://github.com/use-ink/cargo-contract/pull/2098)
 
 ## [6.0.0-alpha]
 

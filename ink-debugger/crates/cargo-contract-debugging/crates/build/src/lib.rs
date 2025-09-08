@@ -378,7 +378,7 @@ fn exec_cargo_for_onchain_target(
         let mut rustflags = {
             let common_flags = "-Clinker-plugin-lto\x1f-Clink-arg=-zstack-size=4096";
             if let Some(target_flags) = Target::rustflags() {
-                format!("{}\x1f{}", common_flags, target_flags)
+                format!("{common_flags}\x1f{target_flags}")
             } else {
                 common_flags.to_string()
             }
@@ -403,13 +403,11 @@ fn exec_cargo_for_onchain_target(
         env.push(("CARGO_ENCODED_RUSTFLAGS", Some(rustflags)));
 
         fs::create_dir_all(&crate_metadata.artifact_directory)?;
-        execute_cargo(util::cargo_cmd(
-            command,
-            &args,
-            manifest_path.directory(),
-            *verbosity,
-            env,
-        ))
+
+        let cmd =
+            util::cargo_cmd(command, &args, manifest_path.directory(), *verbosity, env);
+        tracing::debug!("Executing '{:#?}'", cmd);
+        execute_cargo(cmd)
     };
 
     if unstable_flags.original_manifest {
@@ -796,8 +794,14 @@ fn local_build(
         fs::metadata(&crate_metadata.original_code)?.len() as f64 / 1000.0;
 
     let mut config = polkavm_linker::Config::default();
-    config.set_strip(true);
-    config.set_optimize(true);
+    if build_mode == &BuildMode::Debug {
+        config.set_strip(false);
+        config.set_optimize(false);
+        config.set_elide_unnecessary_loads(false);
+    } else {
+        config.set_strip(true);
+        config.set_optimize(true);
+    }
     let orig = fs::read(&crate_metadata.original_code)?;
 
     let linked = match polkavm_linker::program_from_elf(config, orig.as_ref()) {

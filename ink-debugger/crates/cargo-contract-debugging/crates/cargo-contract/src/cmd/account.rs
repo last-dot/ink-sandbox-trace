@@ -80,9 +80,9 @@ impl AccountCommand {
         <C as Config>::AccountId:
             Serialize + Display + IntoVisitor + Decode + AsRef<[u8]> + FromStr,
         HashFor<C>: IntoVisitor + Display,
-        <C as Environment>::Balance: Serialize + Debug + IntoVisitor,
+        <C as Environment>::Balance: Serialize + Debug + IntoVisitor + Display,
         <<C as Config>::AccountId as FromStr>::Err:
-            Into<Box<(dyn std::error::Error)>> + Display,
+            Into<Box<dyn std::error::Error>> + Display,
     {
         let rpc_cli =
             RpcClient::from_url(url_to_string(&self.chain_cli_opts.chain().url()))
@@ -101,18 +101,19 @@ impl AccountCommand {
             .expect("Contract argument shall be present");
 
         let account_id = resolve_h160::<C, C>(&addr, &rpc, &client).await?;
-
-        // todo display account balance as well
-        //let deposit_account_data =
-        //get_account_balance::<C, E>(account, rpc, client).await?;
+        let account_data =
+            contract_extrinsics::get_account_data::<C, C>(&account_id, &rpc, &client)
+                .await?;
 
         if self.output_json {
             let output = serde_json::json!({
-                "account_id": format!("0x{}", hex::encode(account_id))
+                "account_id": format!("0x{}", hex::encode(account_id)),
+                "free": account_data.free,
             });
             println!("{}", serde_json::to_string_pretty(&output)?);
         } else {
-            println!("{}", account_id);
+            println!("Account Id: {account_id}");
+            println!("Free Balance: {}", account_data.free);
         }
         Ok(())
     }

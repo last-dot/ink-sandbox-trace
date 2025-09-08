@@ -72,6 +72,8 @@ use predicates as _;
 #[cfg(test)]
 use regex as _;
 #[cfg(test)]
+use sp_keyring as _;
+#[cfg(test)]
 use tempfile as _;
 
 // Only used on windows.
@@ -264,7 +266,7 @@ fn exec(cmd: Command) -> Result<()> {
         }
         Command::GenerateSchema(generate) => {
             let result = generate.run().map_err(format_err)?;
-            println!("{}", result);
+            println!("{result}");
             Ok(())
         }
         Command::VerifySchema(verify) => {
