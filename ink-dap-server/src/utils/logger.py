@@ -1,6 +1,6 @@
 """
 Debug adapter logging configuration
-Logs go to both stderr and debug_adapter.log file
+Logs go to both stdout and debug_adapter.log file
 """
 
 import logging
@@ -10,7 +10,7 @@ from pathlib import Path
 
 def setup_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
     """
-    Setup logger with output to stderr and file.
+    Setup logger with output to stdout and file.
 
     Args:
         name: Logger name
@@ -31,8 +31,8 @@ def setup_logger(name: str, level: int = logging.DEBUG) -> logging.Logger:
         datefmt="%Y-%m-%d %H:%M:%S"
     )
 
-    # Console handler (stderr)
-    console_handler = logging.StreamHandler(sys.stderr)
+    # Console handler (stdout)
+    console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(level)
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
