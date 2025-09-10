@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    path::PathBuf,
-    sync::{Mutex, OnceLock},
-};
+use std::{collections::{hash_map::Entry, HashMap}, env, path::PathBuf, sync::{Mutex, OnceLock}};
 
 use cargo_metadata::{Metadata, MetadataCommand, Package};
 use contract_build::{
@@ -116,9 +112,9 @@ fn build_contract_crate(pkg: FeaturedPackage) -> (String, PathBuf) {
     {
         Entry::Occupied(ready) => ready.get().clone(),
         Entry::Vacant(todo) => {
+            let target_dir: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(PathBuf::from("target"));
             let args = ExecuteArgs {
-                //TODO: real target dir
-                target_dir: Some(PathBuf::from("/Users/maliketh/ink/ink-sandbox-trace/ink-trace-extension/sampleWorkspace/target")),
+                target_dir: Some(target_dir),
                 manifest_path,
                 verbosity: Verbosity::Default,
                 build_mode: BuildMode::Debug,
