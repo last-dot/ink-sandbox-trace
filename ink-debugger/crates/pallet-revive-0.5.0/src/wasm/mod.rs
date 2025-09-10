@@ -305,6 +305,7 @@ where
 		let exec_result = loop {
 			let interrupt = self.instance.run();
 			sandbox.step(&self.instance);
+
 			let program_counter = &mut self.instance.program_counter();
 			if let Some(exec_result) =
 				self.runtime.handle_interrupt(interrupt, &self.module, &mut self.instance, program_counter)
@@ -418,6 +419,7 @@ where
 		input_data: Vec<u8>,
 	) -> ExecResult {
 		println!("[pallet-revive call 'execute']");
+
 		let prepared_call = self.prepare_call(Runtime::new(ext, input_data), function, 0)?;
 		prepared_call.call()
 	}

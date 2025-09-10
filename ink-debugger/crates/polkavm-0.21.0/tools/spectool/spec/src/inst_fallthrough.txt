@@ -1,6 +1,0 @@
-pre: gas = 10000
-
-pub @main:
-    fallthrough
-
-post: gas = 9998

@@ -1,8 +1,4 @@
-use std::{
-    collections::{hash_map::Entry, HashMap},
-    path::PathBuf,
-    sync::{Mutex, OnceLock},
-};
+use std::{collections::{hash_map::Entry, HashMap}, env, path::PathBuf, sync::{Mutex, OnceLock}};
 
 use cargo_metadata::{Metadata, MetadataCommand, Package};
 use contract_build::{
@@ -105,7 +101,7 @@ fn build_contract_crate(pkg: FeaturedPackage) -> (String, PathBuf) {
     let manifest_path = get_manifest_path(pkg.package);
     let mut features = Features::default();
     for feature in pkg.features_on {
-        features.push(&feature);
+        features.push(feature);
     }
 
     match CONTRACTS_BUILT
@@ -116,7 +112,9 @@ fn build_contract_crate(pkg: FeaturedPackage) -> (String, PathBuf) {
     {
         Entry::Occupied(ready) => ready.get().clone(),
         Entry::Vacant(todo) => {
+            let target_dir: PathBuf = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join(PathBuf::from("target"));
             let args = ExecuteArgs {
+                target_dir: Some(target_dir),
                 manifest_path,
                 verbosity: Verbosity::Default,
                 build_mode: BuildMode::Debug,
@@ -127,10 +125,9 @@ fn build_contract_crate(pkg: FeaturedPackage) -> (String, PathBuf) {
                 keep_debug_symbols: true,
                 extra_lints: false,
                 output_type: OutputType::HumanReadable,
-                metadata_spec: MetadataSpec::Ink,
+                metadata_spec: Some(MetadataSpec::Ink),
                 image: ImageVariant::Default,
             };
-
 
             let result = contract_build::execute(args).expect("Error building contract");
             let bundle_path = match result

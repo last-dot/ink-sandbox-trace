@@ -4,8 +4,11 @@ version = "0.1.0"
 authors = ["[your_name] <[your_email]>"]
 edition = "2021"
 
+[profile.release]
+debug = true
+
 [dependencies]
-ink = { version = "6.0.0-alpha", default-features = false, features = ["unstable-hostfn"] }
+ink = { git = "https://github.com/use-ink/ink", branch = "master", version = "6.0.0-alpha.1", default-features = false, features = ["unstable-hostfn"] }
 
 [dev-dependencies]
 drink = { path = "../../ink-debugger/drink" }
@@ -16,6 +19,16 @@ path = "lib.rs"
 [features]
 default = ["std"]
 std = [
-    "ink/std"
+    "ink/std",
 ]
 ink-as-dependency = []
+e2e-tests = []
+
+[package.metadata.ink-lang]
+abi = "ink"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+check-cfg = [
+    'cfg(ink_abi, values("ink", "sol", "all"))'
+]
