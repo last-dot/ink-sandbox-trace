@@ -24,53 +24,53 @@ def main():
     logger = setup_logger("InkDebugAdapter")
 
     logger.info("=" * 60)
-    logger.info("🚀 STARTING INK! DEBUG ADAPTER")
+    logger.info("STARTING INK! DEBUG ADAPTER")
     logger.info("=" * 60)
-    logger.info(f"📂 Working directory: {Path.cwd()}")
-    logger.info(f"🐍 Python version: {sys.version}")
-    logger.info(f"📄 Script path: {__file__}")
-    logger.info(f"📁 Src path: {src_path}")
+    logger.info(f"Working directory: {Path.cwd()}")
+    logger.info(f"Python version: {sys.version}")
+    logger.info(f"Script path: {__file__}")
+    logger.info(f"Src path: {src_path}")
 
     try:
         # Import modules
-        logger.info("📦 Importing modules...")
+        logger.info("Importing modules...")
         from adapter.debug_adapter import DebugAdapter
-        logger.info("✅ Modules imported successfully")
+        logger.info("Modules imported successfully")
 
         # Create adapter
-        logger.info("🏗️ Creating DebugAdapter instance...")
+        logger.info("Creating DebugAdapter instance...")
         adapter = DebugAdapter()
-        logger.info("✅ DebugAdapter created successfully")
+        logger.info("DebugAdapter created successfully")
 
         # Check asyncio compatibility
-        logger.info("🔄 Checking asyncio compatibility...")
+        logger.info("Checking asyncio compatibility...")
 
         # For Windows compatibility
         if sys.platform == 'win32':
-            logger.info("🪟 Windows detected, setting ProactorEventLoopPolicy")
+            logger.info("Windows detected, setting ProactorEventLoopPolicy")
             asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
         # Create new event loop
-        logger.info("🔁 Creating new event loop...")
+        logger.info("Creating new event loop...")
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        logger.info("✅ Event loop created successfully")
+        logger.info("Event loop created successfully")
 
         # Run adapter
-        logger.info("🎯 Starting debug adapter main loop...")
+        logger.info("Starting debug adapter main loop...")
         loop.run_until_complete(adapter.run())
-        logger.info("✅ Debug adapter finished normally")
+        logger.info("Debug adapter finished normally")
 
     except ImportError as e:
-        logger.error(f"❌ Import error: {e}")
-        logger.error(f"📍 Import traceback:\n{traceback.format_exc()}")
+        logger.error(f"Import error: {e}")
+        logger.error(f"Import traceback:\n{traceback.format_exc()}")
         sys.exit(1)
     except KeyboardInterrupt:
-        logger.info("⌨️ Debug adapter terminated by user (Ctrl+C)")
+        logger.info("Debug adapter terminated by user (Ctrl+C)")
         sys.exit(0)
     except Exception as e:
-        logger.error(f"💥 Fatal error: {e}")
-        logger.error(f"📍 Full traceback:\n{traceback.format_exc()}")
+        logger.error(f"Fatal error: {e}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
 
         # Additional crash log for debugging
         try:
@@ -80,13 +80,13 @@ def main():
                 f.write(f"CRASH TIMESTAMP: {sys.version}\n")
                 f.write(f"ERROR: {e}\n")
                 f.write(f"TRACEBACK:\n{traceback.format_exc()}")
-            logger.error(f"💾 Crash details saved to: {crash_log}")
+            logger.error(f"Crash details saved to: {crash_log}")
         except Exception as crash_error:
-            logger.error(f"❌ Could not write crash log: {crash_error}")
+            logger.error(f"Could not write crash log: {crash_error}")
 
         sys.exit(1)
     finally:
-        logger.info("🏁 Debug adapter main() function ended")
+        logger.info("Debug adapter main() function ended")
 
 
 if __name__ == "__main__":

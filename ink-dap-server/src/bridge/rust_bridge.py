@@ -57,10 +57,10 @@ class RustBridge:
                     asyncio.create_task(self._read_responses())
 
                     self.is_connected = True
-                    self.logger.info("✅ Successfully connected to Rust server!")
+                    self.logger.info("Successfully connected to Rust server!")
 
                 except Exception as e:
-                    self.logger.warning(f"❌ Failed to connect to Rust server: {e}")
+                    self.logger.warning(f"Failed to connect to Rust server: {e}")
                     self.is_connected = False
                     self.reader = None
                     self.writer = None
