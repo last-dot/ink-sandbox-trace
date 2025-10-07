@@ -1,8 +1,6 @@
 # ink-sandbox-trace
 Debugger for smart contracts for ink!
 
-# InkScope Step-Debugger for Ink! v6
-
 ---
 
 ## Project overview :page_facing_up:
@@ -10,22 +8,7 @@ Debugger for smart contracts for ink!
 ### Overview
 
 - **Tagline**: An IDE-integrated step-debugger for Ink! v6 smart contracts using the Debug Adapter Protocol (DAP)
-- **Brief description**: We propose a developer tool that enables step-by-step debugging of Ink! v6 smart contracts directly inside VS Code, using a custom Debug Adapter built for PolkaVM and pallet-revive. This allows developers to set breakpoints, step through execution, and inspect state—without running a node.
-- **Relation to Ink! ecosystem**: The tool will be the first step-debugger for Ink! v6 using the new tracing APIs from pallet-revive and PolkaVM. This brings the debugging experience closer to that of Solidity and other modern smart contract ecosystems.
-- **Chosen project category: Tools**
-- **Importance**: Step-debugging is a crucial part of modern developer workflows. This project fills a gap in the Ink! toolchain by introducing interactive, IDE-native debugging, drastically improving productivity.
-- **Why our team is interested**: As active Ink! developers, we feel the pain of debugging through logs and tracing. The new tracing APIs in Ink! v6 give us the opportunity to fix this once and for all with a structured, polished tool.
-
----
-
-### Ink! ecosystem impact
-
-This **step-debugger** will benefit the Ink! ecosystem by offering:
-
-- **Modern tooling**: Brings Ink! debugging up to par with EVM-like tools like Hardhat and Remix.
-- **Lowering the learning curve**: Makes smart contract behavior visible and understandable, especially for newer developers.
-- **Developer velocity**: Reduces iteration time and frustration by enabling real-time debugging instead of post-mortem log analysis.
-- **Toolchain completeness**: Supports the Ink! 6 migration and broader Polkadot ecosystem readiness.
+- **Brief description**: Developer tool that enables step-by-step debugging of Ink! v6 smart contracts directly inside VS Code, using a custom Debug Adapter built for PolkaVM and pallet-revive. This allows developers to set breakpoints, step through execution, and inspect state—without running a node.
 
 ---
 
@@ -39,26 +22,14 @@ This **step-debugger** will benefit the Ink! ecosystem by offering:
     2. **Architecture overview**:
         - **VS Code Extension**: Minimal shell for launching debug sessions via launch.json.
         - **Rust-based Debug Adapter**: Bridges VS Code and the PolkaVM sandbox, managing execution and state.
-        - **Ink! execution backend**: Uses DRink! or a similar runtime with PolkaVM interpreter mode.
+        - **Ink! execution backend**: Uses DRink! with PolkaVM interpreter mode.
 2. **Technology stack**:
     - **DAP**: Debug Adapter Protocol (JSON over stdio)
     - **Rust**: For the adapter and runtime integration
     - **VS Code**: For UI
     - **PolkaVM + pallet-revive**: Target execution engine
     - **Ink! v6**: Target contract language
-3. **Documentation & prior research**:
-    - Extensive review of PolkaVM, DRink!, and DAP.
-    - Planning done with Ink! v6 in mind—focused on the future stack.
-4. **Non-goals / limitations**:
-    - Does not target to support Ink! v5 or `pallet-contracts`
-    - Does not include a unified GUI
-    - Does not support expression evaluation or conditional breakpoints in MVP
-6. **Category**: Infrastructure (Tools)
-7. **Business model**: Open-source debugging tool with no monetization planned. The primary goal is community adoption.
-8. **Growth strategy and future plans**: Future versions may include advanced features like expression evaluation, conditional breakpoints, multi-contract debugging, custom GUI, and community-driven improvements.
 
-> Exclusions:
->
 > - We do not support old Ink! versions or Substrate Wasm contracts. This is strictly for Ink! v6 and pallet-revive.
 
 ---
