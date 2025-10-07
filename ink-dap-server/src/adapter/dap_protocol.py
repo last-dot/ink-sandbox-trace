@@ -132,6 +132,16 @@ class DAPProtocol:
 
         self.send_message(message)
 
+    def send_output(self, text: str, category: str = "console"):
+            """Send output to VS Code Debug Console via DAP output event."""
+            if not text.endswith('\n'):
+                text += '\n'
+
+            self.send_event("output", {
+                "category": category,
+                "output": text
+            })
+
     def _next_seq(self) -> int:
         """Get next sequence number."""
         seq = self._sequence

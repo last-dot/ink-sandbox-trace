@@ -62,10 +62,24 @@ class DebugAdapter:
 
         self.logger.info("Debug adapter initialized")
 
+    def log_to_console(self, message: str, level: str = "INFO"):
+        """Send log message to VS Code Debug Console."""
+        formatted_msg = f"[{level}] {message}"
+        self.protocol.send_output(formatted_msg, category="console")
+        # Также пишем в файл
+        if level == "ERROR":
+            self.logger.error(message)
+        elif level == "WARNING":
+            self.logger.warning(message)
+        else:
+            self.logger.info(message)
+
+
     async def run(self):
         """Main loop for the debug adapter - async version."""
         self.is_running = True
         self.logger.info("Debug adapter started, waiting for DAP messages...")
+        self.log_to_console("Debug adapter started, waiting for DAP messages...")
 
         # Start reading in separate task
         await self._read_loop()
@@ -81,6 +95,7 @@ class DebugAdapter:
                 message = await loop.run_in_executor(None, self.protocol.read_message)
                 if message:
                     self.logger.info(f"Received DAP message: {message.get('command', 'unknown')}")
+                    self.log_to_console(f"Received DAP message: {message.get('command', 'unknown')}")
                     await self._handle_message(message)
                 else:
                     self.logger.debug("No message received, continuing...")
@@ -137,12 +152,14 @@ class DebugAdapter:
     async def _handle_initialize(self, request: Dict[str, Any]):
         """Handle 'initialize' request."""
         self.logger.info("Initializing debug adapter...")
+        self.log_to_console("Initializing debug adapter...")
 
         try:
             # Send capabilities
             self.logger.info("Sending capabilities to VS Code...")
             self.protocol.send_response(request, body=self.capabilities)
             self.logger.info("Capabilities sent successfully")
+            self.log_to_console("Capabilities sent successfully")
 
             # Mark as initialized
             self.is_initialized = True
@@ -152,6 +169,7 @@ class DebugAdapter:
             self.logger.info("Sending 'initialized' event to VS Code...")
             self.protocol.send_event("initialized")
             self.logger.info("'Initialized' event sent successfully")
+            self.log_to_console("'Initialized' event sent successfully")
 
         except Exception as e:
             self.logger.error(f"Error in initialize: {e}", exc_info=True)
@@ -170,13 +188,14 @@ class DebugAdapter:
             return
 
         self.logger.info(f"Launching debugger for contract: {program}")
+        self.log_to_console(f"Launching debugger for contract: {program}")
 
         # Initialize Rust bridge
         self.logger.info("Initializing Rust bridge...")
         self.rust_bridge = RustBridge()
 
         try:
-            self.logger.info("⏳ Starting Rust bridge connection...")
+            self.logger.info("Starting Rust bridge connection...")
             await self.rust_bridge.start()
 
             # Initialize with contract path
@@ -193,6 +212,7 @@ class DebugAdapter:
         self.protocol.send_response(request)
         self.stop_on_entry = args.get("stopOnEntry", False)
         self.logger.info(f"Launch completed, stopOnEntry: {self.stop_on_entry}")
+        self.log_to_console("Launch completed")
 
     async def _handle_set_breakpoints(self, request: Dict[str, Any]):
         """Handle 'setBreakpoints' request."""
@@ -389,3 +409,4 @@ class DebugAdapter:
         """Stop the debug adapter."""
         self.is_running = False
         self.logger.info("Debug adapter stopped")
+
