@@ -26,7 +26,7 @@ You should see the **“Run Test | Debug”** buttons above each DRink test in `
 
 
 ## 4. Run a DRink Test
-1.	Press F5 or run **“Launch”** from the Run menu. This starts the debug session — you’ll see confirmation in the Python backend logs. Since breakpoints and step functionality are not yet implemented, you can stop the session at this point.
+1.	Press F5 or run **“Launch”** from the Run menu. This starts the debug session — you’ll see confirmation in the Python backend logs file. You should also see logs in the debug console confirming that the **Python DAP server** is running and responding — this verifies the extension is properly connected to the backend. Since breakpoints and step functionality are not yet implemented, you can stop the session at this point.
 2. Click **“Run Test”** on any test (or press Run button from the Run menu).  
 Wait for the build in the terminal to complete.
 3. This triggers the **DRink test pipeline**:
@@ -39,7 +39,6 @@ Wait for the build in the terminal to complete.
 1. Open the **console output** in VSCode (Terminal).
 2. You should see logs with [ink_debug_rpc::sandbox_rpc] prefix
 3. These logs come from our **custom sandbox RPC** - each log line corresponds to a **program counter (step)** in contract execution.
-4. You should also see logs confirming that the **Python DAP server** is running and responding — this verifies the extension is properly connected to the backend.
 
 **Success Criteria**
 - Python DAP server launches successfully and stays active.
@@ -47,4 +46,3 @@ Wait for the build in the terminal to complete.
 - Sample workspace builds.
 - DRink test runs end-to-end.
 - Console shows `[ink_debug_rpc::sandbox_rpc]` logs with step info.
-- Python backend logs confirm it’s active and ready to handle debug commands.
